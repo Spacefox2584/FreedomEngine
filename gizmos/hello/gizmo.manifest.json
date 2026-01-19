@@ -1,0 +1,11 @@
+{
+  "id": "hello",
+  "name": "Hello",
+  "version": "0.1.0",
+  "icon": "HI",
+  "entry": "/gizmos/hello/gizmo.js",
+  "capabilities_needed": ["pane", "nav"],
+  "outputs": ["open_pane"],
+  "touches": ["none"],
+  "failure_modes": ["mount_error"]
+}
