@@ -19,12 +19,6 @@
   letter-spacing: 0.2px;
 }
 
-.cdeck-sub {
-  color: var(--muted);
-  font-size: 13px;
-  margin-top: 4px;
-}
-
 .cdeck-body {
   padding: 14px;
   overflow: auto;
@@ -54,15 +48,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-}
-
-.lane-name {
   font-weight: 700;
-}
-
-.lane-count {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .cards {
@@ -77,6 +63,8 @@
   padding: 10px;
   background: rgba(255,255,255,0.04);
   cursor: pointer;
+  position: relative;
+  padding-right: 70px;
 }
 
 .card:hover {
@@ -92,4 +80,26 @@
   color: var(--muted);
   font-size: 12px;
   line-height: 1.3;
+}
+
+.card-actions {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.mini {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.mini:hover {
+  border-color: var(--border-2);
 }
