@@ -2,12 +2,19 @@ import { parseUrlState, writeUrlState, formatRouteHint } from "./urlState.js";
 import { createPaneController } from "./pane.js";
 import { loadManifest } from "./gizmoLoader.js";
 import { createSpaceManager } from "./spaceManager.js";
+import * as Store from "./store.js";
 
+// --------------------
+// MANIFESTS
+// --------------------
 const MANIFEST_PATHS = [
   "/gizmos/cdeck/gizmo.manifest.json",
   "/gizmos/hello/gizmo.manifest.json",
 ];
 
+// --------------------
+// DOM
+// --------------------
 const elSpaces = document.getElementById("fe-spaces");
 const elMount = document.getElementById("fe-mount");
 const elPane = document.getElementById("fe-pane");
@@ -17,18 +24,24 @@ const elPaneClose = document.getElementById("fe-pane-close");
 const elRouteHint = document.getElementById("fe-route-hint");
 const btnTheme = document.getElementById("fe-toggle-theme");
 
+// --------------------
+// APP STATE
+// --------------------
 const app = {
-  manifests: new Map(),  // id -> manifest
+  manifests: new Map(), // id -> manifest
   order: [],
   state: {
     space: "cdeck",
     card: null,
     pane: false,
   },
-  // Per-space cached UI selection (memory only in R1)
-  cache: new Map(), // id -> { card, pane }
+  // Per-space cached UI selection (memory-only in R1/R2)
+  cache: new Map(), // spaceId -> { card, pane }
 };
 
+// --------------------
+// PANE
+// --------------------
 const pane = createPaneController({
   paneEl: elPane,
   titleEl: elPaneTitle,
@@ -36,33 +49,62 @@ const pane = createPaneController({
   closeBtn: elPaneClose,
   onStateChange: ({ open }) => {
     app.state.pane = !!open;
+
+    // If pane closes, clear card selection from URL (keeps state clean)
     if (!open) {
-      // If pane closes, clear card selection from URL (keeps it clean)
       app.state.card = null;
     }
+
     cacheSpaceUi(app.state.space);
     writeUrlState(app.state);
     renderRouteHint();
   },
 });
 
+// --------------------
+// CORE API + SPACE MANAGER
+// --------------------
 const coreApi = createCoreApi();
 const spaceManager = createSpaceManager({ mountEl: elMount, pane, coreApi });
 
-boot();
+// --------------------
+// BOOT
+// --------------------
+boot().catch((err) => {
+  console.error("FE boot failed:", err);
+  // Keep UI alive even if store fails; shell should still load.
+  // If boot fails hard, render a simple crash panel.
+  elMount.innerHTML = `
+    <div style="padding:16px">
+      <div style="font-weight:700; margin-bottom:6px">Shell boot failed</div>
+      <div style="color:var(--muted); margin-bottom:10px">
+        Check console. FE should remain inspectable.
+      </div>
+      <div style="border:1px solid var(--border); border-radius:12px; padding:10px; background:rgba(255,255,255,0.03)">
+        <div style="font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px; white-space:pre-wrap">${
+          escapeHtml(err?.message || String(err))
+        }</div>
+      </div>
+    </div>
+  `;
+});
 
 async function boot() {
-  // Theme toggle (R1)
+  // Theme toggle (simple, R1/R2)
   btnTheme.addEventListener("click", () => {
-    document.body.dataset.theme = document.body.dataset.theme === "dark" ? "light" : "dark";
+    document.body.dataset.theme =
+      document.body.dataset.theme === "dark" ? "light" : "dark";
   });
+
+  // R2: initialise local-first store (journal replay etc).
+  // Must not block UI interactions later; this is boot-time only.
+  await Store.initStore();
 
   // Load manifests
   await loadAllManifests();
 
   // Initial state from URL
   const fromUrl = parseUrlState();
-  // If URL asks for something invalid, fall back safely
   app.state.space = app.manifests.has(fromUrl.space) ? fromUrl.space : "cdeck";
   app.state.card = fromUrl.card;
   app.state.pane = fromUrl.pane;
@@ -78,8 +120,8 @@ async function boot() {
 
   // Pane restore
   if (app.state.pane && card) {
-    // Let gizmo decide what pane content is; we provide a default if it doesn’t.
-    // (Gizmo will usually open it when selecting a card. This is a safety.)
+    // Gizmo should typically open pane itself on selection.
+    // This is a safe fallback.
     pane.open({
       title: "Details",
       render: (host) => {
@@ -99,16 +141,15 @@ async function boot() {
     const targetSpace = app.manifests.has(s.space) ? s.space : "cdeck";
     const card2 = s.card;
 
-    // Update + mount
     app.state.space = targetSpace;
     app.state.card = card2;
     app.state.pane = !!s.pane;
+
     renderSpaces();
 
     await mountSpace(targetSpace, { card: card2 });
 
     if (app.state.pane && card2) {
-      // Gizmo should open; fallback default:
       pane.open({
         title: "Details",
         render: (host) => {
@@ -124,6 +165,9 @@ async function boot() {
   });
 }
 
+// --------------------
+// MANIFEST LOADING
+// --------------------
 async function loadAllManifests() {
   const loaded = await Promise.all(
     MANIFEST_PATHS.map(async (p) => {
@@ -138,33 +182,33 @@ async function loadAllManifests() {
   });
 }
 
+// --------------------
+// SPACE MOUNTING
+// --------------------
 async function mountSpace(spaceId, { card = null } = {}) {
   const manifest = app.manifests.get(spaceId);
   if (!manifest) return;
 
   app.state.space = spaceId;
   app.state.card = card;
-  // Pane open state is a per-space cached preference (unless URL explicitly says otherwise)
-  const cached = app.cache.get(spaceId);
-  if (cached && app.state.pane === false && cached.pane === true && !app.state.card) {
-    // If we had pane open but no card, we don't force it. Keep it closed.
-  }
 
   await spaceManager.mountSpace(manifest, { card });
 
-  // Persist UI cache (memory only in R1)
   cacheSpaceUi(spaceId);
 
-  // Update URL + hint
   writeUrlState(app.state);
   renderRouteHint();
 }
 
+// --------------------
+// UI RENDERING
+// --------------------
 function renderSpaces() {
   elSpaces.innerHTML = "";
 
   for (const id of app.order) {
     const m = app.manifests.get(id);
+
     const btn = document.createElement("button");
     btn.className = "space-tab";
     btn.dataset.active = id === app.state.space ? "1" : "0";
@@ -184,7 +228,7 @@ function renderSpaces() {
       // Cache outgoing space UI
       cacheSpaceUi(app.state.space);
 
-      // Restore incoming space UI (memory only)
+      // Restore incoming space UI (memory-only cache)
       const cached = app.cache.get(id);
       const nextCard = cached?.card ?? null;
 
@@ -194,6 +238,7 @@ function renderSpaces() {
       app.state.space = id;
       app.state.card = nextCard;
       app.state.pane = false;
+
       renderSpaces();
 
       await mountSpace(id, { card: nextCard });
@@ -214,13 +259,11 @@ function renderRouteHint() {
   elRouteHint.textContent = formatRouteHint(app.state);
 }
 
-/**
- * Core API: what gizmos can do in R1.
- * Keep it small.
- */
+// --------------------
+// CORE API (what gizmos can do)
+// --------------------
 function createCoreApi() {
   function log(...args) {
-    // Dev-simple logging. Can be swapped later.
     console.log(...args);
   }
 
@@ -231,24 +274,26 @@ function createCoreApi() {
      */
     selectCard: (cardId, { openPane = true } = {}) => {
       app.state.card = cardId;
-      if (openPane) {
-        app.state.pane = true;
-      }
+      if (openPane) app.state.pane = true;
+
       cacheSpaceUi(app.state.space);
       writeUrlState(app.state);
       renderRouteHint();
     },
 
     /**
-     * Switch to another space (gizmo).
+     * Switch to another space (gizmo)
      */
     goToSpace: async (spaceId) => {
       if (!app.manifests.has(spaceId)) return;
+
       cacheSpaceUi(app.state.space);
       pane.close();
+
       app.state.space = spaceId;
       app.state.card = null;
       app.state.pane = false;
+
       renderSpaces();
       await mountSpace(spaceId, { card: null });
     },
@@ -275,5 +320,25 @@ function createCoreApi() {
     get: () => ({ ...app.state }),
   };
 
-  return { nav, paneApi, stateApi, log };
+  // R2: expose local-first store to gizmos (core-owned)
+  const storeApi = {
+    get: Store.get,
+    list: Store.list,
+    mutate: Store.mutate,
+    subscribe: Store.subscribe,
+  };
+
+  return { nav, paneApi, stateApi, store: storeApi, log };
+}
+
+// --------------------
+// UTIL
+// --------------------
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
