@@ -1,0 +1,95 @@
+.cdeck {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
+}
+
+.cdeck-head {
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cdeck-title {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.cdeck-sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.cdeck-body {
+  padding: 14px;
+  overflow: auto;
+}
+
+.lanes {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 320px;
+  gap: 12px;
+  align-items: start;
+  min-height: 0;
+}
+
+.lane {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.03);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.lane-head {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.lane-name {
+  font-weight: 700;
+}
+
+.lane-count {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cards {
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(255,255,255,0.04);
+  cursor: pointer;
+}
+
+.card:hover {
+  border-color: var(--border-2);
+}
+
+.card-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.card-meta {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
