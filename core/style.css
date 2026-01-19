@@ -207,7 +207,24 @@ body {
   color: var(--muted);
   background: rgba(255,255,255,0.02);
   font-size: 12px;
+  position: relative;
+  z-index: 5;
 }
+
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.hint { min-width: 0; }
 
 .btn {
   border: 1px solid var(--border);
@@ -220,9 +237,7 @@ body {
 }
 
 .btn:hover { border-color: var(--border-2); }
-.btn.ghost {
-  background: transparent;
-}
+.btn.ghost { background: transparent; }
 .btn.small {
   padding: 8px 10px;
   border-radius: 10px;
@@ -239,6 +254,51 @@ body {
   font-size: 12px;
 }
 
+/* Inspector */
+.inspector {
+  position: fixed;
+  right: 14px;
+  bottom: 56px;
+  width: min(520px, calc(100vw - 28px));
+  max-height: min(420px, calc(100vh - 120px));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  box-shadow: var(--shadow);
+  display: none;
+  overflow: hidden;
+  z-index: 30;
+}
+
+.inspector[data-open="1"] {
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.inspector-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.inspector-title {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.inspector-body {
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
 /* Mobile: pane becomes inline (still no modal) */
 @media (max-width: 980px) {
   .main {
@@ -251,5 +311,10 @@ body {
   }
   .pane[data-open="0"] {
     display: none;
+  }
+  .inspector {
+    right: 10px;
+    left: 10px;
+    width: auto;
   }
 }
