@@ -1,0 +1,26 @@
+.hello {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.hello-card {
+  width: min(720px, 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.03);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.hello-title {
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.hello-sub {
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
