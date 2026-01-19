@@ -1,0 +1,11 @@
+{
+  "id": "cdeck",
+  "name": "C-Deck",
+  "version": "0.1.0",
+  "icon": "CD",
+  "entry": "/gizmos/cdeck/gizmo.js",
+  "capabilities_needed": ["pane", "nav"],
+  "outputs": ["select_card"],
+  "touches": ["none"],
+  "failure_modes": ["mount_error", "render_error"]
+}
