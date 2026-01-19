@@ -23,6 +23,9 @@ const elPaneBody = document.getElementById("fe-pane-body");
 const elPaneClose = document.getElementById("fe-pane-close");
 const elRouteHint = document.getElementById("fe-route-hint");
 const btnTheme = document.getElementById("fe-toggle-theme");
+const btnInspector = document.getElementById("fe-inspector-toggle");
+const elInspector = document.getElementById("fe-inspector");
+const elInspectorBody = document.getElementById("fe-inspector-body");
 
 // --------------------
 // APP STATE
@@ -35,8 +38,9 @@ const app = {
     card: null,
     pane: false,
   },
-  // Per-space cached UI selection (memory-only in R1/R2)
   cache: new Map(), // spaceId -> { card, pane }
+  inspectorOpen: false,
+  inspectorTimer: null,
 };
 
 // --------------------
@@ -49,11 +53,7 @@ const pane = createPaneController({
   closeBtn: elPaneClose,
   onStateChange: ({ open }) => {
     app.state.pane = !!open;
-
-    // If pane closes, clear card selection from URL (keeps state clean)
-    if (!open) {
-      app.state.card = null;
-    }
+    if (!open) app.state.card = null;
 
     cacheSpaceUi(app.state.space);
     writeUrlState(app.state);
@@ -72,32 +72,40 @@ const spaceManager = createSpaceManager({ mountEl: elMount, pane, coreApi });
 // --------------------
 boot().catch((err) => {
   console.error("FE boot failed:", err);
-  // Keep UI alive even if store fails; shell should still load.
-  // If boot fails hard, render a simple crash panel.
   elMount.innerHTML = `
     <div style="padding:16px">
       <div style="font-weight:700; margin-bottom:6px">Shell boot failed</div>
-      <div style="color:var(--muted); margin-bottom:10px">
-        Check console. FE should remain inspectable.
-      </div>
+      <div style="color:var(--muted); margin-bottom:10px">Check console.</div>
       <div style="border:1px solid var(--border); border-radius:12px; padding:10px; background:rgba(255,255,255,0.03)">
-        <div style="font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px; white-space:pre-wrap">${
-          escapeHtml(err?.message || String(err))
-        }</div>
+        <div style="font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px; white-space:pre-wrap">${escapeHtml(
+          err?.message || String(err)
+        )}</div>
       </div>
     </div>
   `;
 });
 
 async function boot() {
-  // Theme toggle (simple, R1/R2)
+  // Theme toggle
   btnTheme.addEventListener("click", () => {
     document.body.dataset.theme =
       document.body.dataset.theme === "dark" ? "light" : "dark";
   });
 
-  // R2: initialise local-first store (journal replay etc).
-  // Must not block UI interactions later; this is boot-time only.
+  // Inspector toggle (dev-only)
+  btnInspector.addEventListener("click", () => toggleInspector());
+
+  // Keyboard toggle: Ctrl+` (or Cmd+` on mac)
+  window.addEventListener("keydown", (e) => {
+    const isMac = navigator.platform.toLowerCase().includes("mac");
+    const metaOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+    if (metaOrCtrl && e.key === "`") {
+      e.preventDefault();
+      toggleInspector();
+    }
+  });
+
+  // Init local-first store (snapshot + replay)
   await Store.initStore();
 
   // Load manifests
@@ -118,10 +126,8 @@ async function boot() {
 
   await mountSpace(app.state.space, { card });
 
-  // Pane restore
+  // Pane restore (fallback only)
   if (app.state.pane && card) {
-    // Gizmo should typically open pane itself on selection.
-    // This is a safe fallback.
     pane.open({
       title: "Details",
       render: (host) => {
@@ -170,10 +176,7 @@ async function boot() {
 // --------------------
 async function loadAllManifests() {
   const loaded = await Promise.all(
-    MANIFEST_PATHS.map(async (p) => {
-      const m = await loadManifest(p);
-      return m;
-    })
+    MANIFEST_PATHS.map(async (p) => loadManifest(p))
   );
 
   loaded.forEach((m) => {
@@ -195,9 +198,13 @@ async function mountSpace(spaceId, { card = null } = {}) {
   await spaceManager.mountSpace(manifest, { card });
 
   cacheSpaceUi(spaceId);
-
   writeUrlState(app.state);
   renderRouteHint();
+
+  // Update inspector quickly when switching spaces
+  if (app.inspectorOpen) {
+    await renderInspector();
+  }
 }
 
 // --------------------
@@ -225,14 +232,11 @@ function renderSpaces() {
     btn.appendChild(label);
 
     btn.addEventListener("click", async () => {
-      // Cache outgoing space UI
       cacheSpaceUi(app.state.space);
 
-      // Restore incoming space UI (memory-only cache)
       const cached = app.cache.get(id);
       const nextCard = cached?.card ?? null;
 
-      // Close pane now; gizmo will open it if needed
       pane.close();
 
       app.state.space = id;
@@ -240,7 +244,6 @@ function renderSpaces() {
       app.state.pane = false;
 
       renderSpaces();
-
       await mountSpace(id, { card: nextCard });
     });
 
@@ -260,6 +263,57 @@ function renderRouteHint() {
 }
 
 // --------------------
+// INSPECTOR
+// --------------------
+async function toggleInspector() {
+  app.inspectorOpen = !app.inspectorOpen;
+  elInspector.dataset.open = app.inspectorOpen ? "1" : "0";
+
+  btnInspector.textContent = app.inspectorOpen ? "Inspector: ON" : "Inspector";
+
+  if (app.inspectorTimer) {
+    clearInterval(app.inspectorTimer);
+    app.inspectorTimer = null;
+  }
+
+  if (app.inspectorOpen) {
+    await renderInspector();
+    app.inspectorTimer = setInterval(renderInspector, 1000);
+  }
+}
+
+async function renderInspector() {
+  const s = await Store.stats();
+  const active = app.manifests.get(app.state.space);
+  const activeLabel = active ? `${active.id} @ ${active.version || "0.0.0"}` : "(none)";
+
+  const countsLines = Object.entries(s.counts || {})
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([k, v]) => `${k}: ${v}`)
+    .join("\n");
+
+  const snapTs = s.journal.snapshotTs ? new Date(s.journal.snapshotTs).toLocaleString() : "—";
+  const snapSeq = s.journal.snapshotLastSeqApplied ?? "—";
+
+  elInspectorBody.textContent =
+`SPACE: ${activeLabel}
+URL: ${formatRouteHint(app.state)}
+
+OBJECT COUNTS
+${countsLines || "(none)"}
+
+JOURNAL
+nextSeq: ${s.journal.nextSeq}
+journalCount: ${s.journal.journalCount}
+lastAppliedSeq: ${s.lastAppliedSeq}
+
+SNAPSHOT
+snapshotTs: ${snapTs}
+snapshotLastSeqApplied: ${snapSeq}
+`;
+}
+
+// --------------------
 // CORE API (what gizmos can do)
 // --------------------
 function createCoreApi() {
@@ -268,10 +322,6 @@ function createCoreApi() {
   }
 
   const nav = {
-    /**
-     * Select an object (e.g. a card) and optionally open the pane.
-     * This writes URL state immediately.
-     */
     selectCard: (cardId, { openPane = true } = {}) => {
       app.state.card = cardId;
       if (openPane) app.state.pane = true;
@@ -281,9 +331,6 @@ function createCoreApi() {
       renderRouteHint();
     },
 
-    /**
-     * Switch to another space (gizmo)
-     */
     goToSpace: async (spaceId) => {
       if (!app.manifests.has(spaceId)) return;
 
@@ -310,9 +357,7 @@ function createCoreApi() {
       writeUrlState(app.state);
       renderRouteHint();
     },
-    close: () => {
-      pane.close();
-    },
+    close: () => pane.close(),
     isOpen: () => pane.isOpen(),
   };
 
@@ -320,12 +365,12 @@ function createCoreApi() {
     get: () => ({ ...app.state }),
   };
 
-  // R2: expose local-first store to gizmos (core-owned)
   const storeApi = {
     get: Store.get,
     list: Store.list,
     mutate: Store.mutate,
     subscribe: Store.subscribe,
+    forceSnapshot: Store.forceSnapshot,
   };
 
   return { nav, paneApi, stateApi, store: storeApi, log };
