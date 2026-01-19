@@ -6,8 +6,11 @@ export function createSpaceManager({ mountEl, pane, coreApi }) {
   async function mountSpace(manifest, { card = null } = {}) {
     // Unmount current
     if (active?.cleanup) {
-      try { active.cleanup(); } catch (_) {}
+      try {
+        active.cleanup();
+      } catch (_) {}
     }
+
     mountEl.innerHTML = "";
 
     const ctx = createCtx(manifest, { card });
@@ -48,17 +51,26 @@ export function createSpaceManager({ mountEl, pane, coreApi }) {
   }
 
   function createCtx(manifest, { card }) {
-    // Only sanctioned surface area for gizmos in R1.
+    // Only sanctioned surface area for gizmos.
+    // Keep it small and explicit. No hidden globals.
     return {
       gizmo: {
         id: manifest.id,
         name: manifest.name || manifest.id,
         version: manifest.version || "0.0.0",
       },
+
+      // Core services
       nav: coreApi.nav,
       pane: coreApi.paneApi,
       state: coreApi.stateApi,
+
+      // ✅ R2: local-first store (this is what C-Deck needs)
+      store: coreApi.store,
+
       log: (...args) => coreApi.log(`[${manifest.id}]`, ...args),
+
+      // Optional selection restored from URL
       selection: { card },
     };
   }
