@@ -103,3 +103,12 @@
 .mini:hover {
   border-color: var(--border-2);
 }
+.card-dragging {
+  opacity: 0.35;
+}
+
+.lane-drop-hover {
+  outline: 2px solid rgba(255, 106, 0, 0.55);
+  outline-offset: 2px;
+}
+
