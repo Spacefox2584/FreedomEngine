@@ -14,7 +14,7 @@
           <div class="mark">FE</div>
           <div class="brand-text">
             <div class="brand-name">FreedomEngine</div>
-            <div class="brand-sub">Shell v0.1 (R1)</div>
+            <div class="brand-sub">Shell v0.1 (R3)</div>
           </div>
         </div>
 
@@ -23,6 +23,9 @@
         <div class="topbar-right">
           <button class="btn ghost" id="fe-toggle-theme" title="Toggle theme">
             Theme
+          </button>
+          <button class="btn ghost" id="fe-inspector-toggle" title="Toggle inspector">
+            Inspector
           </button>
           <div class="status" id="fe-status" title="Status">
             <span class="dot" aria-hidden="true"></span>
@@ -49,11 +52,18 @@
 
       <footer class="bottombar">
         <div class="hint">
-          <span class="kbd">Ctrl</span> + <span class="kbd">K</span> reserved
-          (later). URL state is live now.
+          <span class="kbd">Ctrl</span> + <span class="kbd">`</span> inspector
         </div>
         <div class="hint" id="fe-route-hint"></div>
       </footer>
+
+      <div class="inspector" id="fe-inspector" data-open="0" aria-label="State inspector">
+        <div class="inspector-head">
+          <div class="inspector-title">State Inspector</div>
+          <div class="inspector-sub">Read-only. Updates every second.</div>
+        </div>
+        <pre class="inspector-body" id="fe-inspector-body"></pre>
+      </div>
     </div>
 
     <script type="module" src="./app.js"></script>
