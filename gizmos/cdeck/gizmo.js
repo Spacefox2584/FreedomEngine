@@ -1,186 +1,131 @@
-let cleanup = null;
+let unsubscribe = null;
 
 export async function mount(host, ctx) {
-  // Load CSS (dead simple, no build step)
-  const cssHref = "/gizmos/cdeck/style.css";
-  const link = ensureCss(cssHref);
+  ensureCss("/gizmos/cdeck/style.css");
 
   const root = document.createElement("div");
   root.className = "cdeck";
+  host.appendChild(root);
 
-  const header = document.createElement("div");
-  header.className = "cdeck-head";
+  // Seed lanes once
+  if (ctx.store.list("lane").length === 0) {
+    ["New", "In Progress", "Waiting", "Resolved"].forEach((name, i) => {
+      ctx.store.mutate({
+        type: "lane",
+        op: "put",
+        id: String(i),
+        data: { name },
+      });
+    });
+  }
 
-  const left = document.createElement("div");
+  const render = () => {
+    root.innerHTML = "";
+    root.appendChild(renderHeader(ctx));
+    root.appendChild(renderBody(ctx));
+  };
+
+  unsubscribe = ctx.store.subscribe("card", render);
+  ctx.store.subscribe("lane", render);
+
+  render();
+
+  return {
+    unmount() {
+      unsubscribe?.();
+      root.remove();
+    },
+  };
+}
+
+function renderHeader(ctx) {
+  const h = document.createElement("div");
+  h.className = "cdeck-head";
+
   const title = document.createElement("div");
   title.className = "cdeck-title";
-  title.textContent = "C-Deck v0.1 (surface stub)";
-  const sub = document.createElement("div");
-  sub.className = "cdeck-sub";
-  sub.textContent = "Lanes + cards + pane. No persistence yet.";
-  left.appendChild(title);
-  left.appendChild(sub);
+  title.textContent = "C-Deck";
 
-  const right = document.createElement("div");
   const btn = document.createElement("button");
   btn.className = "btn small";
-  btn.textContent = "New card (stub)";
-  btn.addEventListener("click", () => {
-    ctx.pane.open({
-      title: "Create card (not shipped in R1)",
-      render: (paneHost) => {
-        paneHost.innerHTML = `
-          <div style="color:var(--muted); line-height:1.45">
-            R1 does not create real cards yet.<br/>
-            We’re proving shell + space switching + pane.
-          </div>
-        `;
-      },
-    });
-  });
-  right.appendChild(btn);
+  btn.textContent = "New card";
+  btn.onclick = () => createCard(ctx);
 
-  header.appendChild(left);
-  header.appendChild(right);
+  h.append(title, btn);
+  return h;
+}
 
+function renderBody(ctx) {
   const body = document.createElement("div");
   body.className = "cdeck-body";
 
   const lanesEl = document.createElement("div");
   lanesEl.className = "lanes";
 
-  const lanes = [
-    { name: "New / Untriaged", cards: mockCards("NEW", 3) },
-    { name: "In Progress", cards: mockCards("WIP", 2) },
-    { name: "Awaiting External", cards: mockCards("WAIT", 2) },
-    { name: "Resolved", cards: mockCards("DONE", 1) },
-  ];
+  const lanes = ctx.store.list("lane");
+  const cards = ctx.store.list("card");
 
-  lanes.forEach((lane) => lanesEl.appendChild(renderLane(lane, ctx)));
-
-  body.appendChild(lanesEl);
-
-  root.appendChild(header);
-  root.appendChild(body);
-
-  host.appendChild(root);
-
-  // Restore selection if URL had a card
-  const cardFromUrl = ctx.selection?.card;
-  if (cardFromUrl) {
-    openCard(cardFromUrl, ctx);
-  }
-
-  cleanup = () => {
-    try {
-      root.remove();
-    } catch (_) {}
-    // Keep CSS link (no harm). If you want strict cleanup later, we can ref count.
-    cleanup = null;
-  };
-
-  return {
-    unmount() {
-      cleanup?.();
-    },
-  };
-
-  function renderLane(lane, ctx) {
+  lanes.forEach((lane) => {
     const laneEl = document.createElement("div");
     laneEl.className = "lane";
 
     const head = document.createElement("div");
     head.className = "lane-head";
-
-    const name = document.createElement("div");
-    name.className = "lane-name";
-    name.textContent = lane.name;
-
-    const count = document.createElement("div");
-    count.className = "lane-count";
-    count.textContent = `${lane.cards.length}`;
-
-    head.appendChild(name);
-    head.appendChild(count);
+    head.textContent = lane.name;
 
     const cardsEl = document.createElement("div");
     cardsEl.className = "cards";
 
-    lane.cards.forEach((c) => {
-      const cardEl = document.createElement("div");
-      cardEl.className = "card";
-      cardEl.tabIndex = 0;
-
-      const ct = document.createElement("div");
-      ct.className = "card-title";
-      ct.textContent = c.title;
-
-      const meta = document.createElement("div");
-      meta.className = "card-meta";
-      meta.textContent = c.meta;
-
-      cardEl.appendChild(ct);
-      cardEl.appendChild(meta);
-
-      cardEl.addEventListener("click", () => openCard(c.id, ctx));
-      cardEl.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") openCard(c.id, ctx);
-      });
-
-      cardsEl.appendChild(cardEl);
+    cards.filter(c => c.lane === lane.id).forEach(card => {
+      const el = document.createElement("div");
+      el.className = "card";
+      el.textContent = card.title;
+      el.onclick = () => openCard(card, ctx);
+      cardsEl.appendChild(el);
     });
 
-    laneEl.appendChild(head);
-    laneEl.appendChild(cardsEl);
-    return laneEl;
-  }
+    laneEl.append(head, cardsEl);
+    lanesEl.appendChild(laneEl);
+  });
+
+  body.appendChild(lanesEl);
+  return body;
 }
 
-function openCard(cardId, ctx) {
-  ctx.nav.selectCard(cardId, { openPane: true });
+function createCard(ctx) {
+  const id = crypto.randomUUID();
+  ctx.store.mutate({
+    type: "card",
+    op: "put",
+    id,
+    data: {
+      title: "New customer interaction",
+      lane: "0",
+      notes: [],
+    },
+  });
+}
+
+function openCard(card, ctx) {
+  ctx.nav.selectCard(card.id, { openPane: true });
 
   ctx.pane.open({
-    title: `Card ${cardId}`,
+    title: card.title,
     render: (host) => {
       host.innerHTML = `
-        <div style="display:grid; gap:10px">
-          <div style="font-weight:700">Customer interaction (stub)</div>
-          <div style="color:var(--muted); line-height:1.45">
-            This is the R1 proof: selecting a card opens the right-side pane,
-            URL state updates, and refresh restores.
-          </div>
-
-          <div style="border:1px solid var(--border); border-radius:12px; padding:10px; background:rgba(255,255,255,0.03)">
-            <div style="color:var(--muted); font-size:12px; margin-bottom:6px">Next</div>
-            <div>R2 adds local-first objects + journal.</div>
-          </div>
+        <div>
+          <div style="margin-bottom:8px">Notes</div>
+          <button class="btn small">Add note</button>
         </div>
       `;
     },
   });
 }
 
-function mockCards(prefix, n) {
-  const out = [];
-  for (let i = 1; i <= n; i++) {
-    const id = `${prefix}-${String(i).padStart(3, "0")}`;
-    out.push({
-      id,
-      title: `Customer: ${id}`,
-      meta: `Channel: call • Summary stub • Next: follow-up`,
-    });
-  }
-  return out;
-}
-
 function ensureCss(href) {
-  const existing = document.querySelector(`link[data-fe-css="${href}"]`);
-  if (existing) return existing;
-
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = href;
-  link.dataset.feCss = href;
-  document.head.appendChild(link);
-  return link;
+  if (document.querySelector(`link[href="${href}"]`)) return;
+  const l = document.createElement("link");
+  l.rel = "stylesheet";
+  l.href = href;
+  document.head.appendChild(l);
 }
