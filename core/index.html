@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>FreedomEngine</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+
+  <body data-theme="dark">
+    <div id="fe-app" class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark">FE</div>
+          <div class="brand-text">
+            <div class="brand-name">FreedomEngine</div>
+            <div class="brand-sub">Shell v0.1 (R1)</div>
+          </div>
+        </div>
+
+        <div class="spaces" id="fe-spaces" aria-label="Spaces"></div>
+
+        <div class="topbar-right">
+          <button class="btn ghost" id="fe-toggle-theme" title="Toggle theme">
+            Theme
+          </button>
+          <div class="status" id="fe-status" title="Status">
+            <span class="dot" aria-hidden="true"></span>
+            <span class="status-text">Local</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="main">
+        <section class="workspace" aria-label="Workspace">
+          <div id="fe-mount" class="mount"></div>
+        </section>
+
+        <aside class="pane" id="fe-pane" aria-label="Detail pane" data-open="0">
+          <div class="pane-header">
+            <div class="pane-title" id="fe-pane-title">Details</div>
+            <button class="btn ghost small" id="fe-pane-close" title="Close pane">
+              Close
+            </button>
+          </div>
+          <div class="pane-body" id="fe-pane-body"></div>
+        </aside>
+      </main>
+
+      <footer class="bottombar">
+        <div class="hint">
+          <span class="kbd">Ctrl</span> + <span class="kbd">K</span> reserved
+          (later). URL state is live now.
+        </div>
+        <div class="hint" id="fe-route-hint"></div>
+      </footer>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
