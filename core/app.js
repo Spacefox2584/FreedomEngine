@@ -23,9 +23,13 @@ const elPaneBody = document.getElementById("fe-pane-body");
 const elPaneClose = document.getElementById("fe-pane-close");
 const elRouteHint = document.getElementById("fe-route-hint");
 const btnTheme = document.getElementById("fe-toggle-theme");
-const btnInspector = document.getElementById("fe-inspector-toggle");
+
+// Inspector (R3)
+const btnInspectToggle = document.getElementById("fe-inspect-toggle");
+const btnInspectClose = document.getElementById("fe-inspect-close");
 const elInspector = document.getElementById("fe-inspector");
-const elInspectorBody = document.getElementById("fe-inspector-body");
+const elInspectBody = document.getElementById("fe-inspect-body");
+const btnSnapshotNow = document.getElementById("fe-snapshot-now");
 
 // --------------------
 // APP STATE
@@ -38,10 +42,11 @@ const app = {
     card: null,
     pane: false,
   },
+  // Per-space cached UI selection (memory-only in R1/R2/R3)
   cache: new Map(), // spaceId -> { card, pane }
-  inspectorOpen: false,
-  inspectorTimer: null,
 };
+
+let inspectorTimer = null;
 
 // --------------------
 // PANE
@@ -53,7 +58,10 @@ const pane = createPaneController({
   closeBtn: elPaneClose,
   onStateChange: ({ open }) => {
     app.state.pane = !!open;
-    if (!open) app.state.card = null;
+
+    if (!open) {
+      app.state.card = null;
+    }
 
     cacheSpaceUi(app.state.space);
     writeUrlState(app.state);
@@ -75,11 +83,13 @@ boot().catch((err) => {
   elMount.innerHTML = `
     <div style="padding:16px">
       <div style="font-weight:700; margin-bottom:6px">Shell boot failed</div>
-      <div style="color:var(--muted); margin-bottom:10px">Check console.</div>
+      <div style="color:var(--muted); margin-bottom:10px">
+        Check console. FE should remain inspectable.
+      </div>
       <div style="border:1px solid var(--border); border-radius:12px; padding:10px; background:rgba(255,255,255,0.03)">
-        <div style="font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px; white-space:pre-wrap">${escapeHtml(
-          err?.message || String(err)
-        )}</div>
+        <div style="font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px; white-space:pre-wrap">${
+          escapeHtml(err?.message || String(err))
+        }</div>
       </div>
     </div>
   `;
@@ -92,20 +102,16 @@ async function boot() {
       document.body.dataset.theme === "dark" ? "light" : "dark";
   });
 
-  // Inspector toggle (dev-only)
-  btnInspector.addEventListener("click", () => toggleInspector());
+  // R3: inspector toggle
+  btnInspectToggle?.addEventListener("click", () => setInspectorOpen(true));
+  btnInspectClose?.addEventListener("click", () => setInspectorOpen(false));
 
-  // Keyboard toggle: Ctrl+` (or Cmd+` on mac)
-  window.addEventListener("keydown", (e) => {
-    const isMac = navigator.platform.toLowerCase().includes("mac");
-    const metaOrCtrl = isMac ? e.metaKey : e.ctrlKey;
-    if (metaOrCtrl && e.key === "`") {
-      e.preventDefault();
-      toggleInspector();
-    }
+  btnSnapshotNow?.addEventListener("click", async () => {
+    await Store.snapshotNow();
+    if (isInspectorOpen()) await refreshInspector();
   });
 
-  // Init local-first store (snapshot + replay)
+  // R2/R3: initialise local-first store (now snapshot-aware)
   await Store.initStore();
 
   // Load manifests
@@ -120,13 +126,13 @@ async function boot() {
   // Render tabs
   renderSpaces();
 
-  // Mount initial space (with cached state if URL didn’t specify)
+  // Mount initial space
   const cached = app.cache.get(app.state.space);
   const card = app.state.card ?? cached?.card ?? null;
 
   await mountSpace(app.state.space, { card });
 
-  // Pane restore (fallback only)
+  // Pane restore
   if (app.state.pane && card) {
     pane.open({
       title: "Details",
@@ -152,7 +158,6 @@ async function boot() {
     app.state.pane = !!s.pane;
 
     renderSpaces();
-
     await mountSpace(targetSpace, { card: card2 });
 
     if (app.state.pane && card2) {
@@ -200,11 +205,6 @@ async function mountSpace(spaceId, { card = null } = {}) {
   cacheSpaceUi(spaceId);
   writeUrlState(app.state);
   renderRouteHint();
-
-  // Update inspector quickly when switching spaces
-  if (app.inspectorOpen) {
-    await renderInspector();
-  }
 }
 
 // --------------------
@@ -263,54 +263,35 @@ function renderRouteHint() {
 }
 
 // --------------------
-// INSPECTOR
+// Inspector (R3)
 // --------------------
-async function toggleInspector() {
-  app.inspectorOpen = !app.inspectorOpen;
-  elInspector.dataset.open = app.inspectorOpen ? "1" : "0";
+function isInspectorOpen() {
+  return elInspector?.dataset.open === "1";
+}
 
-  btnInspector.textContent = app.inspectorOpen ? "Inspector: ON" : "Inspector";
+function setInspectorOpen(open) {
+  if (!elInspector) return;
 
-  if (app.inspectorTimer) {
-    clearInterval(app.inspectorTimer);
-    app.inspectorTimer = null;
-  }
+  elInspector.dataset.open = open ? "1" : "0";
 
-  if (app.inspectorOpen) {
-    await renderInspector();
-    app.inspectorTimer = setInterval(renderInspector, 1000);
+  if (open) {
+    refreshInspector();
+    inspectorTimer = window.setInterval(refreshInspector, 500);
+  } else {
+    if (inspectorTimer) window.clearInterval(inspectorTimer);
+    inspectorTimer = null;
   }
 }
 
-async function renderInspector() {
-  const s = await Store.stats();
-  const active = app.manifests.get(app.state.space);
-  const activeLabel = active ? `${active.id} @ ${active.version || "0.0.0"}` : "(none)";
+async function refreshInspector() {
+  if (!elInspectBody) return;
 
-  const countsLines = Object.entries(s.counts || {})
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([k, v]) => `${k}: ${v}`)
-    .join("\n");
-
-  const snapTs = s.journal.snapshotTs ? new Date(s.journal.snapshotTs).toLocaleString() : "—";
-  const snapSeq = s.journal.snapshotLastSeqApplied ?? "—";
-
-  elInspectorBody.textContent =
-`SPACE: ${activeLabel}
-URL: ${formatRouteHint(app.state)}
-
-OBJECT COUNTS
-${countsLines || "(none)"}
-
-JOURNAL
-nextSeq: ${s.journal.nextSeq}
-journalCount: ${s.journal.journalCount}
-lastAppliedSeq: ${s.lastAppliedSeq}
-
-SNAPSHOT
-snapshotTs: ${snapTs}
-snapshotLastSeqApplied: ${snapSeq}
-`;
+  try {
+    const stats = await Store.getDebugStats();
+    elInspectBody.textContent = JSON.stringify(stats, null, 2);
+  } catch (e) {
+    elInspectBody.textContent = `Inspector error: ${e?.message || String(e)}`;
+  }
 }
 
 // --------------------
@@ -370,7 +351,10 @@ function createCoreApi() {
     list: Store.list,
     mutate: Store.mutate,
     subscribe: Store.subscribe,
-    forceSnapshot: Store.forceSnapshot,
+
+    // R3 extras (harmless, optional)
+    snapshotNow: Store.snapshotNow,
+    getDebugStats: Store.getDebugStats,
   };
 
   return { nav, paneApi, stateApi, store: storeApi, log };
