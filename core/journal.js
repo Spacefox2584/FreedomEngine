@@ -1,83 +1,84 @@
-import { openDb, txDone } from "./idb.js";
+import { openDb } from "./idb.js";
 
 let db = null;
-let seq = 0;
-
-const SNAPSHOT_ID = "latest";
-const META_KEY = "journal_seq";
+let nextSeq = 0;
 
 export async function initJournal() {
   db = await openDb();
 
-  // Restore seq from meta if present, else scan last journal entry
-  const metaSeq = await readMeta(META_KEY);
-  if (typeof metaSeq === "number") {
-    seq = metaSeq;
-    return;
-  }
-
+  // Find next sequence number (append position)
   const tx = db.transaction("journal", "readonly");
   const store = tx.objectStore("journal");
 
-  await new Promise((resolve) => {
+  return new Promise((resolve) => {
     const req = store.openCursor(null, "prev");
     req.onsuccess = () => {
-      if (req.result) seq = req.result.key + 1;
+      if (req.result) nextSeq = req.result.key + 1;
       resolve();
     };
   });
+}
 
-  await writeMeta(META_KEY, seq);
+export function getSeqInfo() {
+  return {
+    nextSeq,
+    lastSeq: Math.max(-1, nextSeq - 1),
+  };
 }
 
 export async function appendAction(action) {
   const entry = {
-    seq,
+    seq: nextSeq,
     ts: Date.now(),
     action,
   };
-  seq++;
+  nextSeq++;
 
-  const tx = db.transaction(["journal", "meta"], "readwrite");
+  const tx = db.transaction("journal", "readwrite");
   tx.objectStore("journal").put(entry);
-  tx.objectStore("meta").put({ key: META_KEY, value: seq });
-  await txDone(tx);
 
   return entry;
 }
 
-export async function replayJournal(applyFn, { fromSeqExclusive = -1 } = {}) {
+export async function replayJournal(applyFn) {
+  return replayJournalFrom(0, applyFn);
+}
+
+/**
+ * Replay journal entries from a minimum seq (inclusive).
+ */
+export async function replayJournalFrom(minSeq, applyFn) {
   const tx = db.transaction("journal", "readonly");
   const store = tx.objectStore("journal");
 
-  await new Promise((resolve) => {
-    const req = store.openCursor();
+  const range = typeof minSeq === "number" ? IDBKeyRange.lowerBound(minSeq) : null;
+
+  return new Promise((resolve) => {
+    const req = store.openCursor(range);
     req.onsuccess = () => {
       const cursor = req.result;
-      if (!cursor) return resolve();
-
-      const entry = cursor.value;
-      if (entry.seq > fromSeqExclusive) {
-        applyFn(entry.action);
+      if (cursor) {
+        applyFn(cursor.value.action);
+        cursor.continue();
+      } else {
+        resolve();
       }
-      cursor.continue();
     };
   });
 }
 
-export async function saveSnapshot(stateObj, { lastSeqApplied } = {}) {
-  const payload = {
-    id: SNAPSHOT_ID,
-    ts: Date.now(),
-    lastSeqApplied: typeof lastSeqApplied === "number" ? lastSeqApplied : -1,
-    state: stateObj,
-  };
-
+/**
+ * Snapshot is a durable compressed "truth" of the store at a point in time.
+ * We store which journal seq the snapshot includes (uptoSeq).
+ */
+export async function saveSnapshot(state, uptoSeq) {
   const tx = db.transaction("snapshot", "readwrite");
-  tx.objectStore("snapshot").put(payload);
-  await txDone(tx);
-
-  return payload;
+  tx.objectStore("snapshot").put({
+    id: "latest",
+    ts: Date.now(),
+    uptoSeq: typeof uptoSeq === "number" ? uptoSeq : getSeqInfo().lastSeq,
+    state,
+  });
 }
 
 export async function loadSnapshot() {
@@ -85,67 +86,61 @@ export async function loadSnapshot() {
   const store = tx.objectStore("snapshot");
 
   return new Promise((resolve) => {
-    const req = store.get(SNAPSHOT_ID);
+    const req = store.get("latest");
     req.onsuccess = () => resolve(req.result || null);
-    req.onerror = () => resolve(null);
   });
 }
 
-export async function compactJournal({ upToSeqInclusive }) {
-  // Deletes journal entries <= upToSeqInclusive
-  const cutoff = typeof upToSeqInclusive === "number" ? upToSeqInclusive : -1;
-  if (cutoff < 0) return;
+/**
+ * Delete journal entries through (and including) uptoSeq.
+ * This is compaction: snapshot holds the truth, so old actions can be discarded.
+ */
+export async function clearJournalThrough(uptoSeq) {
+  if (typeof uptoSeq !== "number" || uptoSeq < 0) return;
 
   const tx = db.transaction("journal", "readwrite");
   const store = tx.objectStore("journal");
 
-  await new Promise((resolve) => {
+  return new Promise((resolve) => {
     const req = store.openCursor();
     req.onsuccess = () => {
       const cursor = req.result;
       if (!cursor) return resolve();
 
-      if (cursor.key <= cutoff) {
+      if (cursor.key <= uptoSeq) {
         cursor.delete();
+        cursor.continue();
+      } else {
+        resolve();
       }
-      cursor.continue();
     };
   });
-
-  await txDone(tx);
 }
 
+/**
+ * Small stats helper for the inspector.
+ */
 export async function getJournalStats() {
-  const snapshot = await loadSnapshot();
   const tx = db.transaction("journal", "readonly");
   const store = tx.objectStore("journal");
 
-  const count = await new Promise((resolve) => {
-    const req = store.count();
-    req.onsuccess = () => resolve(req.result || 0);
-    req.onerror = () => resolve(0);
-  });
-
-  return {
-    nextSeq: seq,
-    journalCount: count,
-    snapshotTs: snapshot?.ts ?? null,
-    snapshotLastSeqApplied: snapshot?.lastSeqApplied ?? null,
+  const out = {
+    count: 0,
+    firstSeq: null,
+    lastSeq: null,
+    nextSeq,
   };
-}
 
-async function readMeta(key) {
-  const tx = db.transaction("meta", "readonly");
-  const store = tx.objectStore("meta");
   return new Promise((resolve) => {
-    const req = store.get(key);
-    req.onsuccess = () => resolve(req.result?.value);
-    req.onerror = () => resolve(undefined);
-  });
-}
+    const req = store.openCursor();
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (!cursor) return resolve(out);
 
-async function writeMeta(key, value) {
-  const tx = db.transaction("meta", "readwrite");
-  tx.objectStore("meta").put({ key, value });
-  await txDone(tx);
+      out.count++;
+      if (out.firstSeq === null) out.firstSeq = cursor.key;
+      out.lastSeq = cursor.key;
+      cursor.continue();
+    };
+  });
 }
