@@ -40,8 +40,12 @@ export async function mount(host, ctx) {
 
   return {
     unmount() {
-      try { unsubCards?.(); } catch (_) {}
-      try { unsubLanes?.(); } catch (_) {}
+      try {
+        unsubCards?.();
+      } catch (_) {}
+      try {
+        unsubLanes?.();
+      } catch (_) {}
       root.remove();
     },
   };
@@ -78,6 +82,9 @@ function renderBody(ctx) {
     const laneEl = document.createElement("div");
     laneEl.className = "lane";
 
+    // ✅ Required for drag/drop target detection
+    laneEl.dataset.laneId = lane.id;
+
     const head = document.createElement("div");
     head.className = "lane-head";
     head.textContent = lane.name;
@@ -90,6 +97,9 @@ function renderBody(ctx) {
       .forEach((card) => {
         const el = document.createElement("div");
         el.className = "card";
+
+        // ✅ Drag/drop enabled (click/hold + drag)
+        makeCardDraggable(el, card, ctx);
 
         const title = document.createElement("div");
         title.className = "card-title";
@@ -125,6 +135,7 @@ function renderBody(ctx) {
 
         el.append(title, meta, actions);
 
+        // Note: click still opens card as before.
         el.onclick = () => openCard(card, ctx);
 
         cardsEl.appendChild(el);
@@ -212,25 +223,28 @@ function openCard(card, ctx) {
         empty.textContent = "No notes yet.";
         noteList.appendChild(empty);
       } else {
-        notes.slice().reverse().forEach((n) => {
-          const row = document.createElement("div");
-          row.style.border = "1px solid var(--border)";
-          row.style.borderRadius = "12px";
-          row.style.padding = "10px";
-          row.style.background = "rgba(255,255,255,0.03)";
+        notes
+          .slice()
+          .reverse()
+          .forEach((n) => {
+            const row = document.createElement("div");
+            row.style.border = "1px solid var(--border)";
+            row.style.borderRadius = "12px";
+            row.style.padding = "10px";
+            row.style.background = "rgba(255,255,255,0.03)";
 
-          const t = document.createElement("div");
-          t.style.color = "var(--muted)";
-          t.style.fontSize = "12px";
-          t.style.marginBottom = "6px";
-          t.textContent = new Date(n.ts).toLocaleString();
+            const t = document.createElement("div");
+            t.style.color = "var(--muted)";
+            t.style.fontSize = "12px";
+            t.style.marginBottom = "6px";
+            t.textContent = new Date(n.ts).toLocaleString();
 
-          const b = document.createElement("div");
-          b.textContent = n.text;
+            const b = document.createElement("div");
+            b.textContent = n.text;
 
-          row.append(t, b);
-          noteList.appendChild(row);
-        });
+            row.append(t, b);
+            noteList.appendChild(row);
+          });
       }
 
       const input = document.createElement("textarea");
@@ -287,4 +301,162 @@ function ensureCss(href) {
   l.rel = "stylesheet";
   l.href = href;
   document.head.appendChild(l);
+}
+
+/* =========================================================
+   DRAG + DROP (pointer-based)
+   Click/hold then drag into another lane
+   ========================================================= */
+
+function makeCardDraggable(cardEl, card, ctx) {
+  const HOLD_MS = 140; // hold-to-drag threshold
+  const MOVE_PX = 6;   // cancel hold if you move too much
+
+  let holdTimer = null;
+  let dragging = false;
+
+  let startX = 0;
+  let startY = 0;
+  let pointerId = null;
+
+  let ghost = null;
+  let currentLaneEl = null;
+
+  // Important for touch devices: allow pointer events to drive scrolling vs dragging
+  cardEl.style.touchAction = "none";
+
+  cardEl.addEventListener("pointerdown", (e) => {
+    // primary pointer only
+    if (e.button != null && e.button !== 0) return;
+
+    pointerId = e.pointerId;
+    startX = e.clientX;
+    startY = e.clientY;
+
+    try {
+      cardEl.setPointerCapture(pointerId);
+    } catch (_) {}
+
+    holdTimer = setTimeout(() => {
+      dragging = true;
+      ghost = createGhost(cardEl);
+      moveGhost(ghost, e.clientX, e.clientY);
+      cardEl.classList.add("card-dragging");
+    }, HOLD_MS);
+  });
+
+  cardEl.addEventListener("pointermove", (e) => {
+    if (pointerId == null || e.pointerId !== pointerId) return;
+
+    const dx = Math.abs(e.clientX - startX);
+    const dy = Math.abs(e.clientY - startY);
+
+    // Cancel drag intent if user is just scrolling / moving
+    if (!dragging && (dx > MOVE_PX || dy > MOVE_PX)) {
+      clearHold();
+    }
+
+    if (!dragging) return;
+
+    moveGhost(ghost, e.clientX, e.clientY);
+
+    const laneEl = laneFromPoint(e.clientX, e.clientY);
+    if (laneEl !== currentLaneEl) {
+      setLaneHover(currentLaneEl, false);
+      currentLaneEl = laneEl;
+      setLaneHover(currentLaneEl, true);
+    }
+  });
+
+  cardEl.addEventListener("pointerup", (e) => {
+    if (pointerId == null || e.pointerId !== pointerId) return;
+
+    if (dragging) {
+      const laneEl = laneFromPoint(e.clientX, e.clientY);
+      const laneId = laneEl?.dataset?.laneId || null;
+
+      if (laneId && laneId !== card.lane) {
+        // Re-fetch latest card in case it changed while dragging
+        const fresh = ctx.store.get("card", card.id) || card;
+
+        ctx.store.mutate({
+          type: "card",
+          op: "put",
+          id: card.id,
+          data: { ...fresh, lane: String(laneId) },
+        });
+
+        // keep pane aligned if open
+        const state = ctx.state.get();
+        if (state.card === card.id && state.pane) {
+          const updated = ctx.store.get("card", card.id);
+          if (updated) openCard(updated, ctx);
+        }
+      }
+    }
+
+    cleanupDrag();
+  });
+
+  cardEl.addEventListener("pointercancel", cleanupDrag);
+
+  function clearHold() {
+    if (holdTimer) {
+      clearTimeout(holdTimer);
+      holdTimer = null;
+    }
+  }
+
+  function cleanupDrag() {
+    clearHold();
+
+    if (ghost) {
+      ghost.remove();
+      ghost = null;
+    }
+
+    setLaneHover(currentLaneEl, false);
+    currentLaneEl = null;
+
+    cardEl.classList.remove("card-dragging");
+
+    dragging = false;
+    pointerId = null;
+  }
+}
+
+function createGhost(sourceEl) {
+  const r = sourceEl.getBoundingClientRect();
+  const g = sourceEl.cloneNode(true);
+
+  g.style.position = "fixed";
+  g.style.left = "0px";
+  g.style.top = "0px";
+  g.style.width = `${r.width}px`;
+  g.style.pointerEvents = "none";
+  g.style.zIndex = "9999";
+  g.style.opacity = "0.92";
+  g.style.transform = "translate(-9999px, -9999px) scale(1.02)";
+  g.style.boxShadow = "0 18px 40px rgba(0,0,0,0.25)";
+  g.style.borderColor = "rgba(0,0,0,0.25)";
+
+  document.body.appendChild(g);
+  return g;
+}
+
+function moveGhost(ghost, x, y) {
+  if (!ghost) return;
+  ghost.style.transform = `translate(${x + 10}px, ${y + 10}px) scale(1.02)`;
+}
+
+function laneFromPoint(x, y) {
+  const el = document.elementFromPoint(x, y);
+  if (!el) return null;
+  return el.closest?.("[data-lane-id]") || null;
+}
+
+function setLaneHover(laneEl, on) {
+  if (!laneEl) return;
+  if (on) laneEl.classList.add("lane-drop-hover");
+  else laneEl.classList.remove("lane-drop-hover");
 }
