@@ -453,3 +453,16 @@ body.pane-open .pane {
 
   .inspector { right: 10px; left: 10px; width: auto; }
 }
+/* ===============================
+   Dark theme <select> fix
+   =============================== */
+
+body[data-theme="dark"] select {
+  background-color: #1c1c1c;
+  color: #eaeaea;
+}
+
+body[data-theme="dark"] select option {
+  background-color: #ffffff;
+  color: #111111;
+}
