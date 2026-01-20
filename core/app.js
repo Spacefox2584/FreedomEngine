@@ -24,7 +24,7 @@ const elPaneClose = document.getElementById("fe-pane-close");
 const elRouteHint = document.getElementById("fe-route-hint");
 const btnTheme = document.getElementById("fe-toggle-theme");
 
-// Inspector (R3)
+// Inspector
 const btnInspectToggle = document.getElementById("fe-inspect-toggle");
 const btnInspectClose = document.getElementById("fe-inspect-close");
 const elInspector = document.getElementById("fe-inspector");
@@ -35,21 +35,20 @@ const btnSnapshotNow = document.getElementById("fe-snapshot-now");
 // APP STATE
 // --------------------
 const app = {
-  manifests: new Map(), // id -> manifest
+  manifests: new Map(),
   order: [],
   state: {
     space: "cdeck",
     card: null,
     pane: false,
   },
-  // Per-space cached UI selection (memory-only in R1/R2/R3)
-  cache: new Map(), // spaceId -> { card, pane }
+  cache: new Map(),
 };
 
 let inspectorTimer = null;
 
 // --------------------
-// PANE
+// PANE (R3.1: off-canvas desktop)
 // --------------------
 const pane = createPaneController({
   paneEl: elPane,
@@ -59,9 +58,9 @@ const pane = createPaneController({
   onStateChange: ({ open }) => {
     app.state.pane = !!open;
 
-    if (!open) {
-      app.state.card = null;
-    }
+    document.body.classList.toggle("pane-open", open);
+
+    if (!open) app.state.card = null;
 
     cacheSpaceUi(app.state.space);
     writeUrlState(app.state);
@@ -80,29 +79,15 @@ const spaceManager = createSpaceManager({ mountEl: elMount, pane, coreApi });
 // --------------------
 boot().catch((err) => {
   console.error("FE boot failed:", err);
-  elMount.innerHTML = `
-    <div style="padding:16px">
-      <div style="font-weight:700; margin-bottom:6px">Shell boot failed</div>
-      <div style="color:var(--muted); margin-bottom:10px">
-        Check console. FE should remain inspectable.
-      </div>
-      <div style="border:1px solid var(--border); border-radius:12px; padding:10px; background:rgba(255,255,255,0.03)">
-        <div style="font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size:12px; white-space:pre-wrap">${
-          escapeHtml(err?.message || String(err))
-        }</div>
-      </div>
-    </div>
-  `;
+  elMount.innerHTML = `<div style="padding:16px">Shell boot failed</div>`;
 });
 
 async function boot() {
-  // Theme toggle
   btnTheme.addEventListener("click", () => {
     document.body.dataset.theme =
       document.body.dataset.theme === "dark" ? "light" : "dark";
   });
 
-  // R3: inspector toggle
   btnInspectToggle?.addEventListener("click", () => setInspectorOpen(true));
   btnInspectClose?.addEventListener("click", () => setInspectorOpen(false));
 
@@ -111,79 +96,37 @@ async function boot() {
     if (isInspectorOpen()) await refreshInspector();
   });
 
-  // R2/R3: initialise local-first store (now snapshot-aware)
   await Store.initStore();
-
-  // Load manifests
   await loadAllManifests();
 
-  // Initial state from URL
   const fromUrl = parseUrlState();
   app.state.space = app.manifests.has(fromUrl.space) ? fromUrl.space : "cdeck";
   app.state.card = fromUrl.card;
   app.state.pane = fromUrl.pane;
 
-  // Render tabs
   renderSpaces();
 
-  // Mount initial space
   const cached = app.cache.get(app.state.space);
   const card = app.state.card ?? cached?.card ?? null;
 
   await mountSpace(app.state.space, { card });
 
-  // Pane restore
   if (app.state.pane && card) {
-    pane.open({
-      title: "Details",
-      render: (host) => {
-        host.innerHTML = `<div style="color:var(--muted)">Restored pane (no gizmo content yet).</div>`;
-      },
-    });
+    document.body.classList.add("pane-open");
   } else {
     pane.close();
+    document.body.classList.remove("pane-open");
   }
 
   writeUrlState(app.state, { replace: true });
   renderRouteHint();
-
-  // Browser navigation restore
-  window.addEventListener("popstate", async () => {
-    const s = parseUrlState();
-    const targetSpace = app.manifests.has(s.space) ? s.space : "cdeck";
-    const card2 = s.card;
-
-    app.state.space = targetSpace;
-    app.state.card = card2;
-    app.state.pane = !!s.pane;
-
-    renderSpaces();
-    await mountSpace(targetSpace, { card: card2 });
-
-    if (app.state.pane && card2) {
-      pane.open({
-        title: "Details",
-        render: (host) => {
-          host.innerHTML = `<div style="color:var(--muted)">Restored pane (no gizmo content yet).</div>`;
-        },
-      });
-    } else {
-      pane.close();
-    }
-
-    cacheSpaceUi(targetSpace);
-    renderRouteHint();
-  });
 }
 
 // --------------------
 // MANIFEST LOADING
 // --------------------
 async function loadAllManifests() {
-  const loaded = await Promise.all(
-    MANIFEST_PATHS.map(async (p) => loadManifest(p))
-  );
-
+  const loaded = await Promise.all(MANIFEST_PATHS.map(loadManifest));
   loaded.forEach((m) => {
     app.manifests.set(m.id, m);
     app.order.push(m.id);
@@ -208,15 +151,15 @@ async function mountSpace(spaceId, { card = null } = {}) {
 }
 
 // --------------------
-// UI RENDERING
+// UI
 // --------------------
 function renderSpaces() {
   elSpaces.innerHTML = "";
 
   for (const id of app.order) {
     const m = app.manifests.get(id);
-
     const btn = document.createElement("button");
+
     btn.className = "space-tab";
     btn.dataset.active = id === app.state.space ? "1" : "0";
     btn.type = "button";
@@ -228,24 +171,20 @@ function renderSpaces() {
     const label = document.createElement("span");
     label.textContent = m.name || m.id;
 
-    btn.appendChild(icon);
-    btn.appendChild(label);
+    btn.append(icon, label);
 
-    btn.addEventListener("click", async () => {
+    btn.onclick = async () => {
       cacheSpaceUi(app.state.space);
-
-      const cached = app.cache.get(id);
-      const nextCard = cached?.card ?? null;
-
       pane.close();
+      document.body.classList.remove("pane-open");
 
       app.state.space = id;
-      app.state.card = nextCard;
+      app.state.card = null;
       app.state.pane = false;
 
       renderSpaces();
-      await mountSpace(id, { card: nextCard });
-    });
+      await mountSpace(id, { card: null });
+    };
 
     elSpaces.appendChild(btn);
   }
@@ -263,7 +202,7 @@ function renderRouteHint() {
 }
 
 // --------------------
-// Inspector (R3)
+// INSPECTOR
 // --------------------
 function isInspectorOpen() {
   return elInspector?.dataset.open === "1";
@@ -271,103 +210,59 @@ function isInspectorOpen() {
 
 function setInspectorOpen(open) {
   if (!elInspector) return;
-
   elInspector.dataset.open = open ? "1" : "0";
 
   if (open) {
     refreshInspector();
-    inspectorTimer = window.setInterval(refreshInspector, 500);
+    inspectorTimer = setInterval(refreshInspector, 500);
   } else {
-    if (inspectorTimer) window.clearInterval(inspectorTimer);
+    clearInterval(inspectorTimer);
     inspectorTimer = null;
   }
 }
 
 async function refreshInspector() {
-  if (!elInspectBody) return;
-
   try {
     const stats = await Store.getDebugStats();
     elInspectBody.textContent = JSON.stringify(stats, null, 2);
   } catch (e) {
-    elInspectBody.textContent = `Inspector error: ${e?.message || String(e)}`;
+    elInspectBody.textContent = String(e);
   }
 }
 
 // --------------------
-// CORE API (what gizmos can do)
+// CORE API
 // --------------------
 function createCoreApi() {
-  function log(...args) {
-    console.log(...args);
-  }
-
-  const nav = {
-    selectCard: (cardId, { openPane = true } = {}) => {
-      app.state.card = cardId;
-      if (openPane) app.state.pane = true;
-
-      cacheSpaceUi(app.state.space);
-      writeUrlState(app.state);
-      renderRouteHint();
+  return {
+    nav: {
+      selectCard: (cardId, { openPane = true } = {}) => {
+        app.state.card = cardId;
+        if (openPane) {
+          app.state.pane = true;
+          document.body.classList.add("pane-open");
+        }
+        writeUrlState(app.state);
+        renderRouteHint();
+      },
+      closePane: () => {
+        pane.close();
+        document.body.classList.remove("pane-open");
+      },
     },
-
-    goToSpace: async (spaceId) => {
-      if (!app.manifests.has(spaceId)) return;
-
-      cacheSpaceUi(app.state.space);
-      pane.close();
-
-      app.state.space = spaceId;
-      app.state.card = null;
-      app.state.pane = false;
-
-      renderSpaces();
-      await mountSpace(spaceId, { card: null });
+    paneApi: {
+      open: (payload) => pane.open(payload),
+      close: () => pane.close(),
+      isOpen: () => pane.isOpen(),
     },
-
-    closePane: () => pane.close(),
-    openPane: (payload) => pane.open(payload),
-  };
-
-  const paneApi = {
-    open: (payload) => {
-      app.state.pane = true;
-      pane.open(payload);
-      cacheSpaceUi(app.state.space);
-      writeUrlState(app.state);
-      renderRouteHint();
+    stateApi: {
+      get: () => ({ ...app.state }),
     },
-    close: () => pane.close(),
-    isOpen: () => pane.isOpen(),
+    store: {
+      get: Store.get,
+      list: Store.list,
+      mutate: Store.mutate,
+      subscribe: Store.subscribe,
+    },
   };
-
-  const stateApi = {
-    get: () => ({ ...app.state }),
-  };
-
-  const storeApi = {
-    get: Store.get,
-    list: Store.list,
-    mutate: Store.mutate,
-    subscribe: Store.subscribe,
-
-    // R3 extras (harmless, optional)
-    snapshotNow: Store.snapshotNow,
-    getDebugStats: Store.getDebugStats,
-  };
-
-  return { nav, paneApi, stateApi, store: storeApi, log };
-}
-
-// --------------------
-// UTIL
-// --------------------
-function escapeHtml(s) {
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }
