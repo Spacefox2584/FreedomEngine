@@ -4,6 +4,45 @@ import { loadManifest } from "./gizmoLoader.js";
 import { createSpaceManager } from "./spaceManager.js";
 import * as Store from "./store.js";
 
+// ====================
+// FE META (R3.2)
+// ====================
+// Keep this boring and edit it when you tag a release.
+const FE_RELEASE = "FE.01.A1.R3.2";
+const FE_VERSION = "0.1.x";
+
+// Where feedback should go. Change this to your business email.
+const FE_FEEDBACK_EMAIL = "support@freedomengine.io";
+
+// Changelog content (R3.2).
+// Later we can load /CHANGELOG.md, but this is zero-dependency and reliable.
+const FE_CHANGELOG = [
+  {
+    release: "FE.01.A1.R3.2",
+    title: "Operator Chrome",
+    bullets: [
+      "Topbar: Changelog + Feedback",
+      "C-Deck: New card opens pane form (title/details) instead of blind create",
+    ],
+    excludes: ["No Supabase sync", "No auth/presence", "No Live World"],
+  },
+  {
+    release: "FE.01.A1.R3.1",
+    title: "Pane Layout Fix",
+    bullets: ["Desktop: pane no longer reserves width by default (off-canvas intent)"],
+    excludes: ["No mobile redesign"],
+  },
+  {
+    release: "FE.01.A1.R3",
+    title: "Snapshots + Moves",
+    bullets: [
+      "Snapshot compaction to bound journal growth",
+      "C-Deck: lane movement + notes",
+      "Inspector: basic stats",
+    ],
+  },
+];
+
 // --------------------
 // MANIFESTS
 // --------------------
@@ -23,6 +62,10 @@ const elPaneBody = document.getElementById("fe-pane-body");
 const elPaneClose = document.getElementById("fe-pane-close");
 const elRouteHint = document.getElementById("fe-route-hint");
 const btnTheme = document.getElementById("fe-toggle-theme");
+
+// R3.2 buttons
+const btnChangelog = document.getElementById("fe-btn-changelog");
+const btnFeedback = document.getElementById("fe-btn-feedback");
 
 // Inspector
 const btnInspectToggle = document.getElementById("fe-inspect-toggle");
@@ -48,7 +91,7 @@ const app = {
 let inspectorTimer = null;
 
 // --------------------
-// PANE (R3.1: off-canvas desktop)
+// PANE
 // --------------------
 const pane = createPaneController({
   paneEl: elPane,
@@ -83,11 +126,19 @@ boot().catch((err) => {
 });
 
 async function boot() {
+  // Theme toggle
   btnTheme.addEventListener("click", () => {
     document.body.dataset.theme =
       document.body.dataset.theme === "dark" ? "light" : "dark";
   });
 
+  // R3.2: Changelog
+  btnChangelog?.addEventListener("click", () => openChangelogPane());
+
+  // R3.2: Feedback (mailto)
+  btnFeedback?.addEventListener("click", () => openFeedbackMailto());
+
+  // Inspector
   btnInspectToggle?.addEventListener("click", () => setInspectorOpen(true));
   btnInspectClose?.addEventListener("click", () => setInspectorOpen(false));
 
@@ -199,6 +250,122 @@ function cacheSpaceUi(spaceId) {
 
 function renderRouteHint() {
   elRouteHint.textContent = formatRouteHint(app.state);
+}
+
+// --------------------
+// CHANGELOG (R3.2)
+// --------------------
+function openChangelogPane() {
+  // open pane via core to keep state + URL correct
+  coreApi.paneApi.open({
+    title: "Changelog",
+    render: (host) => {
+      host.innerHTML = "";
+
+      const wrap = document.createElement("div");
+      wrap.style.display = "grid";
+      wrap.style.gap = "12px";
+
+      const head = document.createElement("div");
+      head.style.display = "grid";
+      head.style.gap = "4px";
+
+      const h1 = document.createElement("div");
+      h1.style.fontWeight = "800";
+      h1.textContent = `FreedomEngine`;
+
+      const meta = document.createElement("div");
+      meta.style.color = "var(--muted)";
+      meta.style.fontSize = "12px";
+      meta.textContent = `Version: ${FE_VERSION} • Release: ${FE_RELEASE}`;
+
+      head.append(h1, meta);
+
+      const list = document.createElement("div");
+      list.style.display = "grid";
+      list.style.gap = "12px";
+
+      FE_CHANGELOG.forEach((entry) => {
+        const card = document.createElement("div");
+        card.style.border = "1px solid var(--border)";
+        card.style.borderRadius = "12px";
+        card.style.padding = "10px";
+        card.style.background = "rgba(255,255,255,0.03)";
+        card.style.display = "grid";
+        card.style.gap = "8px";
+
+        const t = document.createElement("div");
+        t.style.fontWeight = "800";
+        t.textContent = `${entry.release} — ${entry.title}`;
+
+        const ul = document.createElement("ul");
+        ul.style.margin = "0";
+        ul.style.paddingLeft = "18px";
+        ul.style.display = "grid";
+        ul.style.gap = "4px";
+
+        (entry.bullets || []).forEach((b) => {
+          const li = document.createElement("li");
+          li.textContent = b;
+          ul.appendChild(li);
+        });
+
+        card.appendChild(t);
+        card.appendChild(ul);
+
+        if (entry.excludes && entry.excludes.length) {
+          const ex = document.createElement("div");
+          ex.style.color = "var(--muted)";
+          ex.style.fontSize = "12px";
+          ex.textContent = `Not included: ${entry.excludes.join(" • ")}`;
+          card.appendChild(ex);
+        }
+
+        list.appendChild(card);
+      });
+
+      const foot = document.createElement("div");
+      foot.style.color = "var(--muted)";
+      foot.style.fontSize = "12px";
+      foot.textContent =
+        "Tip: keep changelog entries short, factual, and tied to behaviour/invariants.";
+
+      wrap.append(head, list, foot);
+      host.appendChild(wrap);
+    },
+  });
+}
+
+// --------------------
+// FEEDBACK (R3.2)
+// --------------------
+function openFeedbackMailto() {
+  const state = coreApi.stateApi.get();
+  const ua = navigator.userAgent || "unknown";
+
+  const subject = `[FreedomEngine Feedback] ${FE_RELEASE} • ${state.space}`;
+  const bodyLines = [
+    `Release: ${FE_RELEASE}`,
+    `Version: ${FE_VERSION}`,
+    `Space: ${state.space}`,
+    `Card: ${state.card || ""}`,
+    `URL: ${window.location.href}`,
+    `UA: ${ua}`,
+    ``,
+    `What I was doing:`,
+    ``,
+    `What I expected:`,
+    ``,
+    `What happened:`,
+    ``,
+  ];
+
+  const mailto =
+    `mailto:${encodeURIComponent(FE_FEEDBACK_EMAIL)}` +
+    `?subject=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(bodyLines.join("\n"))}`;
+
+  window.location.href = mailto;
 }
 
 // --------------------
