@@ -28,9 +28,9 @@ body[data-theme="light"] {
   --bg: #eeeeee;                 /* page base */
   --panel: #f6f6f6;              /* subtle surface */
   --panel-2: #fafafa;            /* extra subtle */
-  --topbar: #b2b2b2;             /* requested */
+  --topbar: #141821;             /* requested */
   --topbar-2: #c2c2c2;           /* gentle gradient */
-  --text: #111418;
+  --text: #ffffff;
   --muted: #4f5863;
 
   --border: rgba(0, 0, 0, 0.12);
