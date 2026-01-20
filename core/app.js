@@ -12,7 +12,7 @@ const FE_RELEASE = "FE.01.A1.R3.2";
 const FE_VERSION = "0.1.x";
 
 // Where feedback should go. Change this to your business email.
-const FE_FEEDBACK_EMAIL = "support@freedomengine.io";
+const FE_FEEDBACK_EMAIL = "ops@freedomengine.io";
 
 // Changelog content (R3.2).
 // Later we can load /CHANGELOG.md, but this is zero-dependency and reliable.
