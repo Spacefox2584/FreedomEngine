@@ -5,36 +5,29 @@ export function createPaneController({
   closeBtn,
   onStateChange,
 }) {
-  // Internal truth (don’t rely solely on dataset for logic)
-  let current = { open: false, title: "Details", render: null };
+  let open = false;
 
-  // Must match (or slightly exceed) your CSS transition timing.
-  // Your CSS uses ~0.22s transform + ~0.18s opacity.
+  // Must be >= CSS transition time
   const CLOSE_DELAY_MS = 240;
-
-  // Used to prevent race conditions if the pane is reopened during close animation
   let closeTimer = null;
 
-  function open({ title = "Details", render } = {}) {
-    // If a close is in-flight, cancel it
+  function openPane({ title = "Details", render } = {}) {
+    // Cancel any pending close cleanup
     if (closeTimer) {
       clearTimeout(closeTimer);
       closeTimer = null;
     }
 
-    current = {
-      open: true,
-      title,
-      render: typeof render === "function" ? render : null,
-    };
+    open = true;
 
-    // Mark open immediately (pane can animate in via body class)
+    // Informational only (optional)
     paneEl.dataset.open = "1";
+
     titleEl.textContent = title;
     bodyEl.innerHTML = "";
 
-    if (current.render) {
-      current.render(bodyEl);
+    if (typeof render === "function") {
+      render(bodyEl);
     } else {
       bodyEl.innerHTML = `<div style="color:var(--muted)">No content.</div>`;
     }
@@ -42,40 +35,35 @@ export function createPaneController({
     onStateChange?.({ open: true });
   }
 
-  function close() {
-    // If already closed, no-op
-    if (!current.open) return;
+  function closePane() {
+    if (!open) return;
 
-    // Set internal state closed immediately
-    current = { open: false, title: "Details", render: null };
+    open = false;
 
-    // Tell the shell immediately so it can remove body.pane-open and update URL/state
+    // Tell shell immediately so body.pane-open is removed
     onStateChange?.({ open: false });
 
-    // DO NOT instantly flip dataset to 0 or clear content:
-    // that can short-circuit the slide-out.
-    // Instead, wait for the CSS transition to complete.
-    if (closeTimer) {
-      clearTimeout(closeTimer);
-      closeTimer = null;
-    }
+    // DO NOT touch dataset.open here.
+    // Let CSS animate the slide-out.
 
     closeTimer = setTimeout(() => {
-      // If the pane was reopened during the delay, abort finalization
-      if (current.open) return;
+      if (open) return; // reopened mid-animation
 
-      paneEl.dataset.open = "0";
+      // Clear content AFTER animation
       titleEl.textContent = "Details";
       bodyEl.innerHTML = "";
-      closeTimer = null;
     }, CLOSE_DELAY_MS);
   }
 
   function isOpen() {
-    return current.open;
+    return open;
   }
 
-  closeBtn.addEventListener("click", () => close());
+  closeBtn?.addEventListener("click", closePane);
 
-  return { open, close, isOpen };
+  return {
+    open: openPane,
+    close: closePane,
+    isOpen,
+  };
 }
