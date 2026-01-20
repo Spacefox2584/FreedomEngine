@@ -259,7 +259,7 @@ body {
    PANE
    ========================= */
 
-/* R3.1: Off-canvas pane on desktop */
+/* R3.1b: Off-canvas pane on desktop, animated (no display:none) */
 .pane {
   position: fixed;
   top: 0;
@@ -275,17 +275,21 @@ body {
   grid-template-rows: auto 1fr;
 
   transform: translateX(100%);
-  transition: transform 0.22s ease;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+
+  transition: transform 0.22s ease, opacity 0.18s ease;
   z-index: 40;
 }
 
-/* R3.1: Pane slides in only when opened */
+/* R3.1b: Pane slides in only when opened */
 body.pane-open .pane {
   transform: translateX(0);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
-
-/* Keep existing open/closed semantics for safety */
-.pane[data-open="0"] { display: none; }
 
 .pane-header {
   display: flex;
@@ -433,6 +437,10 @@ body.pane-open .pane {
     height: auto;
 
     transform: none;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+
     transition: none;
 
     border-left: none;
@@ -443,6 +451,5 @@ body.pane-open .pane {
     transform: none;
   }
 
-  .pane[data-open="0"] { display: none; }
   .inspector { right: 10px; left: 10px; width: auto; }
 }
