@@ -40,12 +40,8 @@ export async function mount(host, ctx) {
 
   return {
     unmount() {
-      try {
-        unsubCards?.();
-      } catch (_) {}
-      try {
-        unsubLanes?.();
-      } catch (_) {}
+      try { unsubCards?.(); } catch (_) {}
+      try { unsubLanes?.(); } catch (_) {}
       root.remove();
     },
   };
@@ -62,7 +58,9 @@ function renderHeader(ctx) {
   const btn = document.createElement("button");
   btn.className = "btn small";
   btn.textContent = "New card";
-  btn.onclick = () => createCard(ctx);
+
+  // R3.2: open create form in pane
+  btn.onclick = () => openCreateCardPane(ctx);
 
   h.append(title, btn);
   return h;
@@ -82,7 +80,7 @@ function renderBody(ctx) {
     const laneEl = document.createElement("div");
     laneEl.className = "lane";
 
-    // ✅ Required for drag/drop target detection
+    // Required for drag/drop target detection
     laneEl.dataset.laneId = lane.id;
 
     const head = document.createElement("div");
@@ -98,7 +96,7 @@ function renderBody(ctx) {
         const el = document.createElement("div");
         el.className = "card";
 
-        // ✅ Drag/drop enabled (click/hold + drag)
+        // Drag/drop enabled (click/hold + drag)
         makeCardDraggable(el, card, ctx);
 
         const title = document.createElement("div");
@@ -135,7 +133,6 @@ function renderBody(ctx) {
 
         el.append(title, meta, actions);
 
-        // Note: click still opens card as before.
         el.onclick = () => openCard(card, ctx);
 
         cardsEl.appendChild(el);
@@ -149,16 +146,133 @@ function renderBody(ctx) {
   return body;
 }
 
-function createCard(ctx) {
-  const id = crypto.randomUUID();
-  ctx.store.mutate({
-    type: "card",
-    op: "put",
-    id,
-    data: {
-      title: "New customer interaction",
-      lane: "0",
-      notes: [],
+function openCreateCardPane(ctx) {
+  ctx.pane.open({
+    title: "Create card",
+    render: (host) => {
+      host.innerHTML = "";
+
+      const wrap = document.createElement("div");
+      wrap.style.display = "grid";
+      wrap.style.gap = "10px";
+
+      const labelStyle = "font-size:12px; color: var(--muted); margin-bottom:4px;";
+      const inputStyle =
+        "width:100%; border-radius:12px; border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text); padding:10px;";
+
+      // Title (required)
+      const titleWrap = document.createElement("div");
+      const titleLabel = document.createElement("div");
+      titleLabel.style = labelStyle;
+      titleLabel.textContent = "Title";
+      const titleInput = document.createElement("input");
+      titleInput.type = "text";
+      titleInput.placeholder = "e.g. John Smith — brake pads enquiry";
+      titleInput.style = inputStyle;
+      titleInput.autofocus = true;
+      titleWrap.append(titleLabel, titleInput);
+
+      // Channel (optional)
+      const channelWrap = document.createElement("div");
+      const channelLabel = document.createElement("div");
+      channelLabel.style = labelStyle;
+      channelLabel.textContent = "Channel (optional)";
+      const channelSelect = document.createElement("select");
+      channelSelect.style = inputStyle;
+      const channels = ["", "Call", "Email", "Walk-in", "Web", "Other"];
+      channels.forEach((c) => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c === "" ? "—" : c;
+        channelSelect.appendChild(opt);
+      });
+      channelWrap.append(channelLabel, channelSelect);
+
+      // Summary (optional)
+      const summaryWrap = document.createElement("div");
+      const summaryLabel = document.createElement("div");
+      summaryLabel.style = labelStyle;
+      summaryLabel.textContent = "Summary (optional)";
+      const summaryInput = document.createElement("textarea");
+      summaryInput.placeholder = "One-paragraph summary…";
+      summaryInput.style = inputStyle + "min-height:70px; resize:vertical;";
+      summaryWrap.append(summaryLabel, summaryInput);
+
+      // Next action (optional)
+      const nextWrap = document.createElement("div");
+      const nextLabel = document.createElement("div");
+      nextLabel.style = labelStyle;
+      nextLabel.textContent = "Next action (optional)";
+      const nextInput = document.createElement("input");
+      nextInput.type = "text";
+      nextInput.placeholder = "e.g. Call back with ETA / send quote";
+      nextInput.style = inputStyle;
+      nextWrap.append(nextLabel, nextInput);
+
+      // Buttons
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.gap = "8px";
+      row.style.marginTop = "6px";
+
+      const createBtn = document.createElement("button");
+      createBtn.className = "btn small";
+      createBtn.textContent = "Create";
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.className = "btn ghost small";
+      cancelBtn.textContent = "Cancel";
+      cancelBtn.onclick = () => ctx.nav.closePane?.() || ctx.pane.close();
+
+      // Create action
+      const doCreate = () => {
+        const title = (titleInput.value || "").trim();
+        if (!title) {
+          titleInput.focus();
+          return;
+        }
+
+        const id = crypto.randomUUID();
+        const channel = (channelSelect.value || "").trim();
+        const summary = (summaryInput.value || "").trim();
+        const nextAction = (nextInput.value || "").trim();
+
+        const notes = [];
+        if (summary) notes.push({ ts: Date.now(), text: `Summary: ${summary}` });
+        if (nextAction) notes.push({ ts: Date.now(), text: `Next: ${nextAction}` });
+
+        ctx.store.mutate({
+          type: "card",
+          op: "put",
+          id,
+          data: {
+            title,
+            lane: "0",
+            channel: channel || null,
+            summary: summary || null,
+            nextAction: nextAction || null,
+            notes,
+          },
+        });
+
+        const created = ctx.store.get("card", id);
+        if (created) openCard(created, ctx);
+      };
+
+      createBtn.onclick = doCreate;
+
+      // Enter to create (when focused in title/next input)
+      titleInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") doCreate();
+      });
+      nextInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") doCreate();
+      });
+
+      row.append(createBtn, cancelBtn);
+
+      wrap.append(titleWrap, channelWrap, summaryWrap, nextWrap, row);
+      host.appendChild(wrap);
     },
   });
 }
@@ -186,7 +300,6 @@ function moveCard(card, ctx, direction) {
     data: updated,
   });
 
-  // Keep pane content aligned if this card is open
   const state = ctx.state.get();
   if (state.card === card.id && state.pane) {
     openCard(updated, ctx);
@@ -211,7 +324,8 @@ function openCard(card, ctx) {
       const meta = document.createElement("div");
       meta.style.color = "var(--muted)";
       meta.style.fontSize = "12px";
-      meta.textContent = `Lane: ${laneName}`;
+      const channel = card.channel ? ` • Channel: ${card.channel}` : "";
+      meta.textContent = `Lane: ${laneName}${channel}`;
 
       const noteList = document.createElement("div");
       noteList.style.display = "grid";
@@ -223,28 +337,25 @@ function openCard(card, ctx) {
         empty.textContent = "No notes yet.";
         noteList.appendChild(empty);
       } else {
-        notes
-          .slice()
-          .reverse()
-          .forEach((n) => {
-            const row = document.createElement("div");
-            row.style.border = "1px solid var(--border)";
-            row.style.borderRadius = "12px";
-            row.style.padding = "10px";
-            row.style.background = "rgba(255,255,255,0.03)";
+        notes.slice().reverse().forEach((n) => {
+          const row = document.createElement("div");
+          row.style.border = "1px solid var(--border)";
+          row.style.borderRadius = "12px";
+          row.style.padding = "10px";
+          row.style.background = "rgba(255,255,255,0.03)";
 
-            const t = document.createElement("div");
-            t.style.color = "var(--muted)";
-            t.style.fontSize = "12px";
-            t.style.marginBottom = "6px";
-            t.textContent = new Date(n.ts).toLocaleString();
+          const t = document.createElement("div");
+          t.style.color = "var(--muted)";
+          t.style.fontSize = "12px";
+          t.style.marginBottom = "6px";
+          t.textContent = new Date(n.ts).toLocaleString();
 
-            const b = document.createElement("div");
-            b.textContent = n.text;
+          const b = document.createElement("div");
+          b.textContent = n.text;
 
-            row.append(t, b);
-            noteList.appendChild(row);
-          });
+          row.append(t, b);
+          noteList.appendChild(row);
+        });
       }
 
       const input = document.createElement("textarea");
@@ -280,7 +391,6 @@ function openCard(card, ctx) {
           data: updated,
         });
 
-        // Re-open to refresh pane content
         openCard(updated, ctx);
       };
 
@@ -309,8 +419,8 @@ function ensureCss(href) {
    ========================================================= */
 
 function makeCardDraggable(cardEl, card, ctx) {
-  const HOLD_MS = 140; // hold-to-drag threshold
-  const MOVE_PX = 6;   // cancel hold if you move too much
+  const HOLD_MS = 140;
+  const MOVE_PX = 6;
 
   let holdTimer = null;
   let dragging = false;
@@ -322,11 +432,9 @@ function makeCardDraggable(cardEl, card, ctx) {
   let ghost = null;
   let currentLaneEl = null;
 
-  // Important for touch devices: allow pointer events to drive scrolling vs dragging
   cardEl.style.touchAction = "none";
 
   cardEl.addEventListener("pointerdown", (e) => {
-    // primary pointer only
     if (e.button != null && e.button !== 0) return;
 
     pointerId = e.pointerId;
@@ -351,7 +459,6 @@ function makeCardDraggable(cardEl, card, ctx) {
     const dx = Math.abs(e.clientX - startX);
     const dy = Math.abs(e.clientY - startY);
 
-    // Cancel drag intent if user is just scrolling / moving
     if (!dragging && (dx > MOVE_PX || dy > MOVE_PX)) {
       clearHold();
     }
@@ -376,7 +483,6 @@ function makeCardDraggable(cardEl, card, ctx) {
       const laneId = laneEl?.dataset?.laneId || null;
 
       if (laneId && laneId !== card.lane) {
-        // Re-fetch latest card in case it changed while dragging
         const fresh = ctx.store.get("card", card.id) || card;
 
         ctx.store.mutate({
@@ -386,7 +492,6 @@ function makeCardDraggable(cardEl, card, ctx) {
           data: { ...fresh, lane: String(laneId) },
         });
 
-        // keep pane aligned if open
         const state = ctx.state.get();
         if (state.card === card.id && state.pane) {
           const updated = ctx.store.get("card", card.id);
