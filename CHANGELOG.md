@@ -1,5 +1,18 @@
 # FreedomEngine — Changelog
 
+## FE.01.A1.R4.2 — C-Deck Priority + Ordering + Inline Note Edit
+- Priority added to cards (Urgent/Today/Normal/Backlog) with coloured strip signifier
+- New cards append to bottom (createdAt ordering)
+- Lane arrows fixed (stable lane order)
+- Notes now support inline per-note editing
+- Card delete added (X on card + confirm in pane)
+
+Not included:
+- No Live World
+- No Supabase sync
+- No mobile redesign
+
+
 ## FE.01.A1.R4.1 — C-Deck Interaction Polish
 - Dragging cards no longer selects text (desktop fast-drag fix)
 - Card editor added (Edit button in pane: title, lane, channel, summary, next action)
