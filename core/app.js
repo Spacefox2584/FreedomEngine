@@ -239,19 +239,57 @@ async function openChangelogPane() {
   });
 
   try {
-    // cache-bust so updates show immediately during dev
-    const res = await fetch(`${FE_CHANGELOG_URL}?v=${Date.now()}`);
+    const res = await fetch(`/CHANGELOG.md?v=${Date.now()}`);
     const text = await res.text();
+
+    const lines = text.split("\n");
+
+    const releases = [];
+    let current = null;
+    let mode = "bullets";
+
+    for (const line of lines) {
+      if (line.startsWith("## ")) {
+        if (current) releases.push(current);
+        current = {
+          title: line.replace("## ", "").trim(),
+          bullets: [],
+          excluded: [],
+        };
+        mode = "bullets";
+        continue;
+      }
+
+      if (!current) continue;
+
+      if (line.toLowerCase().startsWith("not included")) {
+        mode = "excluded";
+        continue;
+      }
+
+      if (line.startsWith("- ")) {
+        if (mode === "excluded") {
+          current.excluded.push(line.replace("- ", "").trim());
+        } else {
+          current.bullets.push(line.replace("- ", "").trim());
+        }
+      }
+    }
+
+    if (current) releases.push(current);
 
     coreApi.paneApi.open({
       title: "Changelog",
       render: (host) => {
         host.innerHTML = "";
 
+        const wrap = document.createElement("div");
+        wrap.style.display = "grid";
+        wrap.style.gap = "12px";
+
         const head = document.createElement("div");
         head.style.display = "grid";
         head.style.gap = "4px";
-        head.style.marginBottom = "10px";
 
         const h1 = document.createElement("div");
         h1.style.fontWeight = "800";
@@ -262,28 +300,61 @@ async function openChangelogPane() {
         meta.style.fontSize = "12px";
         meta.textContent = `Version: ${FE_VERSION} • Release: ${FE_RELEASE}`;
 
-        const pre = document.createElement("pre");
-        pre.style.margin = "0";
-        pre.style.whiteSpace = "pre-wrap";
-        pre.style.fontSize = "12px";
-        pre.style.lineHeight = "1.45";
-        pre.style.fontFamily =
-          "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
-        pre.textContent = text || "(empty changelog)";
-
         head.append(h1, meta);
-        host.append(head, pre);
+        wrap.appendChild(head);
+
+        releases.forEach((r) => {
+          const card = document.createElement("div");
+          card.style.border = "1px solid var(--border)";
+          card.style.borderRadius = "12px";
+          card.style.padding = "10px";
+          card.style.background = "rgba(255,255,255,0.03)";
+          card.style.display = "grid";
+          card.style.gap = "8px";
+
+          const title = document.createElement("div");
+          title.style.fontWeight = "800";
+          title.textContent = r.title;
+
+          const ul = document.createElement("ul");
+          ul.style.margin = "0";
+          ul.style.paddingLeft = "18px";
+          ul.style.display = "grid";
+          ul.style.gap = "4px";
+
+          r.bullets.forEach((b) => {
+            const li = document.createElement("li");
+            li.textContent = b;
+            ul.appendChild(li);
+          });
+
+          card.appendChild(title);
+          card.appendChild(ul);
+
+          if (r.excluded.length) {
+            const ex = document.createElement("div");
+            ex.style.color = "var(--muted)";
+            ex.style.fontSize = "12px";
+            ex.textContent = `Not included: ${r.excluded.join(" • ")}`;
+            card.appendChild(ex);
+          }
+
+          wrap.appendChild(card);
+        });
+
+        host.appendChild(wrap);
       },
     });
-  } catch (e) {
+  } catch (err) {
     coreApi.paneApi.open({
       title: "Changelog",
       render: (host) => {
-        host.innerHTML = `<div style="color:var(--muted)">Failed to load /CHANGELOG.md</div>`;
+        host.innerHTML = `<div style="color:var(--muted)">Failed to load changelog</div>`;
       },
     });
   }
 }
+
 
 // --------------------
 // FEEDBACK (R3.2)
