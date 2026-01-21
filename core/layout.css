@@ -1,38 +1,31 @@
 /* =========================================================
-   FE R4 — Layout modes (Compact / Wide)
-   Minimal & non-invasive: does not touch theme tokens.
+   FE.01.A1.R4 — Layout modes (Compact / Wide)
+   - Does NOT touch theme/colors/components.
+   - Only affects geometry and readable width.
    ========================================================= */
 
 :root {
-  --fe-content-max-compact: 100%;
-  --fe-content-max-wide: 1600px;
-  --fe-content-pad-compact: 14px;
-  --fe-content-pad-wide: 18px;
+  --fe-wide-max: 1600px;
+  --fe-wide-max-ultra: 1700px;
 }
 
-/* Default is compact. */
+/* Compact: normal behaviour (no constraints) */
 body[data-layout="compact"] .workspace {
-  max-width: var(--fe-content-max-compact);
-  margin: 0;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
 }
 
-body[data-layout="compact"] .workspace {
-  padding-left: var(--fe-content-pad-compact);
-  padding-right: var(--fe-content-pad-compact);
-}
-
-/* Wide mode: keep content readable and centered */
+/* Wide: keep content readable + centered on ultrawide */
 body[data-layout="wide"] .workspace {
-  max-width: var(--fe-content-max-wide);
+  max-width: var(--fe-wide-max);
   margin-left: auto;
   margin-right: auto;
-  padding-left: var(--fe-content-pad-wide);
-  padding-right: var(--fe-content-pad-wide);
 }
 
-/* On very wide screens, prevent “stretched emptiness” */
+/* On very wide screens, allow slightly more */
 @media (min-width: 1900px) {
   body[data-layout="wide"] .workspace {
-    max-width: 1700px;
+    max-width: var(--fe-wide-max-ultra);
   }
 }
