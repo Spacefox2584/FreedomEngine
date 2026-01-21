@@ -5,10 +5,12 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>FreedomEngine</title>
     <link rel="stylesheet" href="./style.css" />
+    <!-- R4: layout modes (separate file, minimal risk) -->
+    <link rel="stylesheet" href="./layout.css" />
   </head>
 
   <!-- ✅ Light theme is default -->
-  <body data-theme="light">
+  <body data-theme="light" data-layout="compact">
     <div id="fe-app" class="app">
       <header class="topbar">
         <div class="brand">
@@ -22,6 +24,11 @@
         <div class="spaces" id="fe-spaces" aria-label="Spaces"></div>
 
         <div class="topbar-right">
+          <!-- ✅ R4: Layout toggle -->
+          <button class="btn ghost" id="fe-btn-layout" title="Toggle layout mode">
+            Layout
+          </button>
+
           <!-- ✅ R3.2: Changelog + Feedback -->
           <button class="btn ghost" id="fe-btn-changelog" title="View changelog">
             Changelog
