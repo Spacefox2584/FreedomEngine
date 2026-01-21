@@ -164,10 +164,12 @@ function initLayoutMode() {
   const saved = localStorage.getItem(FE_LAYOUT_KEY);
   if (saved === "compact" || saved === "wide") {
     document.body.dataset.layout = saved;
+    updateLayoutButtonLabel();
     return;
   }
   const auto = window.innerWidth >= 1280 ? "wide" : "compact";
   document.body.dataset.layout = auto;
+  updateLayoutButtonLabel();
 }
 
 function toggleLayoutMode() {
@@ -175,6 +177,7 @@ function toggleLayoutMode() {
   const next = current === "compact" ? "wide" : "compact";
   document.body.dataset.layout = next;
   localStorage.setItem(FE_LAYOUT_KEY, next);
+  updateLayoutButtonLabel();
 }
 function updateLayoutButtonLabel() {
   if (!btnLayout) return;
