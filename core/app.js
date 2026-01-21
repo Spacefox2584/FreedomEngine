@@ -5,18 +5,20 @@ import { createSpaceManager } from "./spaceManager.js";
 import * as Store from "./store.js";
 
 // ====================
-// FE META (R3.2)
+// FE META (R4)
 // ====================
 // Keep this boring and edit it when you tag a release.
-const FE_RELEASE = "FE.01.A1.R3.2";
+const FE_RELEASE = "FE.01.A1.R4";
 const FE_VERSION = "0.1.x";
 
 // Where feedback should go. Change this to your business email.
 const FE_FEEDBACK_EMAIL = "ops@freedomengine.io";
 
-// Changelog source of truth (new).
-// This file must be updated first whenever you create a new R revision.
+// Changelog source of truth
 const FE_CHANGELOG_URL = "/CHANGELOG.md";
+
+// R4 layout key
+const FE_LAYOUT_KEY = "fe.layout"; // "compact" | "wide"
 
 // --------------------
 // MANIFESTS
@@ -41,6 +43,9 @@ const btnTheme = document.getElementById("fe-toggle-theme");
 // R3.2 buttons
 const btnChangelog = document.getElementById("fe-btn-changelog");
 const btnFeedback = document.getElementById("fe-btn-feedback");
+
+// R4 button
+const btnLayout = document.getElementById("fe-btn-layout");
 
 // Inspector
 const btnInspectToggle = document.getElementById("fe-inspect-toggle");
@@ -101,16 +106,20 @@ boot().catch((err) => {
 });
 
 async function boot() {
+  // R4: initialise layout mode first (pure UI)
+  initLayoutMode();
+  btnLayout?.addEventListener("click", () => toggleLayoutMode());
+
   // Theme toggle
   btnTheme.addEventListener("click", () => {
     document.body.dataset.theme =
       document.body.dataset.theme === "dark" ? "light" : "dark";
   });
 
-  // R3.2: Changelog
+  // Changelog
   btnChangelog?.addEventListener("click", () => openChangelogPane());
 
-  // R3.2: Feedback (mailto)
+  // Feedback (mailto)
   btnFeedback?.addEventListener("click", () => openFeedbackMailto());
 
   // Inspector
@@ -146,6 +155,26 @@ async function boot() {
 
   writeUrlState(app.state, { replace: true });
   renderRouteHint();
+}
+
+// --------------------
+// R4: Layout modes
+// --------------------
+function initLayoutMode() {
+  const saved = localStorage.getItem(FE_LAYOUT_KEY);
+  if (saved === "compact" || saved === "wide") {
+    document.body.dataset.layout = saved;
+    return;
+  }
+  const auto = window.innerWidth >= 1280 ? "wide" : "compact";
+  document.body.dataset.layout = auto;
+}
+
+function toggleLayoutMode() {
+  const current = document.body.dataset.layout || "compact";
+  const next = current === "compact" ? "wide" : "compact";
+  document.body.dataset.layout = next;
+  localStorage.setItem(FE_LAYOUT_KEY, next);
 }
 
 // --------------------
@@ -228,7 +257,7 @@ function renderRouteHint() {
 }
 
 // --------------------
-// CHANGELOG (now loaded from /CHANGELOG.md)
+// CHANGELOG (loaded from /CHANGELOG.md, carded render)
 // --------------------
 async function openChangelogPane() {
   coreApi.paneApi.open({
@@ -239,7 +268,7 @@ async function openChangelogPane() {
   });
 
   try {
-    const res = await fetch(`/CHANGELOG.md?v=${Date.now()}`);
+    const res = await fetch(`${FE_CHANGELOG_URL}?v=${Date.now()}`);
     const text = await res.text();
 
     const lines = text.split("\n");
@@ -355,9 +384,8 @@ async function openChangelogPane() {
   }
 }
 
-
 // --------------------
-// FEEDBACK (R3.2)
+// FEEDBACK
 // --------------------
 function openFeedbackMailto() {
   const state = coreApi.stateApi.get();
@@ -367,6 +395,8 @@ function openFeedbackMailto() {
   const bodyLines = [
     `Release: ${FE_RELEASE}`,
     `Version: ${FE_VERSION}`,
+    `Layout: ${document.body.dataset.layout || ""}`,
+    `Theme: ${document.body.dataset.theme || ""}`,
     `Space: ${state.space}`,
     `Card: ${state.card || ""}`,
     `URL: ${window.location.href}`,
