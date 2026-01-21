@@ -1,5 +1,15 @@
 # FreedomEngine — Changelog
 
+## FE.01.A1.R4.1 — C-Deck Interaction Polish
+- Dragging cards no longer selects text (desktop fast-drag fix)
+- Card editor added (Edit button in pane: title, lane, channel, summary, next action)
+
+Not included:
+- No Live World
+- No Supabase sync
+- No mobile redesign
+
+
 ## FE.01.A1.R4 — Layout Headroom
 - Layout modes: Compact / Wide (operator toggle)
 - Wide mode centers content for ultrawide monitors
