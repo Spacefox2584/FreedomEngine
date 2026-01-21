@@ -1,0 +1,38 @@
+/* =========================================================
+   FE R4 — Layout modes (Compact / Wide)
+   Minimal & non-invasive: does not touch theme tokens.
+   ========================================================= */
+
+:root {
+  --fe-content-max-compact: 100%;
+  --fe-content-max-wide: 1600px;
+  --fe-content-pad-compact: 14px;
+  --fe-content-pad-wide: 18px;
+}
+
+/* Default is compact. */
+body[data-layout="compact"] .workspace {
+  max-width: var(--fe-content-max-compact);
+  margin: 0;
+}
+
+body[data-layout="compact"] .workspace {
+  padding-left: var(--fe-content-pad-compact);
+  padding-right: var(--fe-content-pad-compact);
+}
+
+/* Wide mode: keep content readable and centered */
+body[data-layout="wide"] .workspace {
+  max-width: var(--fe-content-max-wide);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--fe-content-pad-wide);
+  padding-right: var(--fe-content-pad-wide);
+}
+
+/* On very wide screens, prevent “stretched emptiness” */
+@media (min-width: 1900px) {
+  body[data-layout="wide"] .workspace {
+    max-width: 1700px;
+  }
+}
