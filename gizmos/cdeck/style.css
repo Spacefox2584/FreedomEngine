@@ -64,8 +64,32 @@
   background: rgba(255,255,255,0.04);
   cursor: pointer;
   position: relative;
-  padding-right: 70px;
+
+  /* room for actions */
+  padding-right: 92px;
+
+  /* priority strip */
+  padding-left: 14px;
 }
+
+.card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  border-radius: 999px;
+  opacity: 0.95;
+  background: rgba(255,255,255,0.15); /* default */
+}
+
+.card.priority-urgent::before { background: #ef4444; }
+.card.priority-today::before { background: #f59e0b; }
+.card.priority-normal::before { background: #3b82f6; }
+.card.priority-backlog::before { background: rgba(255,255,255,0.20); }
+
+body[data-theme="light"] .card.priority-backlog::before { background: rgba(0,0,0,0.18); }
 
 .card:hover {
   border-color: var(--border-2);
@@ -104,6 +128,18 @@
   border-color: var(--border-2);
 }
 
+/* delete button */
+.mini.danger {
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+}
+
+/* drag */
 .card-dragging {
   opacity: 0.35;
 }
@@ -111,6 +147,11 @@
 .lane-drop-hover {
   outline: 2px solid rgba(255, 106, 0, 0.55);
   outline-offset: 2px;
+}
+
+/* Light theme drag highlight should be purple/indigo */
+body[data-theme="light"] .lane-drop-hover {
+  outline-color: rgba(107, 92, 255, 0.60);
 }
 
 /* Prevent accidental text selection while dragging cards (desktop + mobile) */
@@ -133,4 +174,41 @@
 .inspector * {
   user-select: text;
   -webkit-user-select: text;
+}
+
+/* inline note edit affordances */
+.note-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255,255,255,0.03);
+  display: grid;
+  gap: 6px;
+}
+
+.note-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.note-ts {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.note-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.note-mini {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
 }
