@@ -14,34 +14,9 @@ const FE_VERSION = "0.1.x";
 // Where feedback should go. Change this to your business email.
 const FE_FEEDBACK_EMAIL = "ops@freedomengine.io";
 
-// Changelog content (R3.2).
-// Later we can load /CHANGELOG.md, but this is zero-dependency and reliable.
-const FE_CHANGELOG = [
-  {
-    release: "FE.01.A1.R3.2",
-    title: "Operator Chrome",
-    bullets: [
-      "Topbar: Changelog + Feedback",
-      "C-Deck: New card opens pane form (title/details) instead of blind create",
-    ],
-    excludes: ["No Supabase sync", "No auth/presence", "No Live World"],
-  },
-  {
-    release: "FE.01.A1.R3.1",
-    title: "Pane Layout Fix",
-    bullets: ["Desktop: pane no longer reserves width by default (off-canvas intent)"],
-    excludes: ["No mobile redesign"],
-  },
-  {
-    release: "FE.01.A1.R3",
-    title: "Snapshots + Moves",
-    bullets: [
-      "Snapshot compaction to bound journal growth",
-      "C-Deck: lane movement + notes",
-      "Inspector: basic stats",
-    ],
-  },
-];
+// Changelog source of truth (new).
+// This file must be updated first whenever you create a new R revision.
+const FE_CHANGELOG_URL = "/CHANGELOG.md";
 
 // --------------------
 // MANIFESTS
@@ -253,87 +228,61 @@ function renderRouteHint() {
 }
 
 // --------------------
-// CHANGELOG (R3.2)
+// CHANGELOG (now loaded from /CHANGELOG.md)
 // --------------------
-function openChangelogPane() {
-  // open pane via core to keep state + URL correct
+async function openChangelogPane() {
   coreApi.paneApi.open({
     title: "Changelog",
     render: (host) => {
-      host.innerHTML = "";
-
-      const wrap = document.createElement("div");
-      wrap.style.display = "grid";
-      wrap.style.gap = "12px";
-
-      const head = document.createElement("div");
-      head.style.display = "grid";
-      head.style.gap = "4px";
-
-      const h1 = document.createElement("div");
-      h1.style.fontWeight = "800";
-      h1.textContent = `FreedomEngine`;
-
-      const meta = document.createElement("div");
-      meta.style.color = "var(--muted)";
-      meta.style.fontSize = "12px";
-      meta.textContent = `Version: ${FE_VERSION} • Release: ${FE_RELEASE}`;
-
-      head.append(h1, meta);
-
-      const list = document.createElement("div");
-      list.style.display = "grid";
-      list.style.gap = "12px";
-
-      FE_CHANGELOG.forEach((entry) => {
-        const card = document.createElement("div");
-        card.style.border = "1px solid var(--border)";
-        card.style.borderRadius = "12px";
-        card.style.padding = "10px";
-        card.style.background = "rgba(255,255,255,0.03)";
-        card.style.display = "grid";
-        card.style.gap = "8px";
-
-        const t = document.createElement("div");
-        t.style.fontWeight = "800";
-        t.textContent = `${entry.release} — ${entry.title}`;
-
-        const ul = document.createElement("ul");
-        ul.style.margin = "0";
-        ul.style.paddingLeft = "18px";
-        ul.style.display = "grid";
-        ul.style.gap = "4px";
-
-        (entry.bullets || []).forEach((b) => {
-          const li = document.createElement("li");
-          li.textContent = b;
-          ul.appendChild(li);
-        });
-
-        card.appendChild(t);
-        card.appendChild(ul);
-
-        if (entry.excludes && entry.excludes.length) {
-          const ex = document.createElement("div");
-          ex.style.color = "var(--muted)";
-          ex.style.fontSize = "12px";
-          ex.textContent = `Not included: ${entry.excludes.join(" • ")}`;
-          card.appendChild(ex);
-        }
-
-        list.appendChild(card);
-      });
-
-      const foot = document.createElement("div");
-      foot.style.color = "var(--muted)";
-      foot.style.fontSize = "12px";
-      foot.textContent =
-        "Tip: keep changelog entries short, factual, and tied to behaviour/invariants.";
-
-      wrap.append(head, list, foot);
-      host.appendChild(wrap);
+      host.innerHTML = `<div style="color:var(--muted)">Loading changelog…</div>`;
     },
   });
+
+  try {
+    // cache-bust so updates show immediately during dev
+    const res = await fetch(`${FE_CHANGELOG_URL}?v=${Date.now()}`);
+    const text = await res.text();
+
+    coreApi.paneApi.open({
+      title: "Changelog",
+      render: (host) => {
+        host.innerHTML = "";
+
+        const head = document.createElement("div");
+        head.style.display = "grid";
+        head.style.gap = "4px";
+        head.style.marginBottom = "10px";
+
+        const h1 = document.createElement("div");
+        h1.style.fontWeight = "800";
+        h1.textContent = "FreedomEngine";
+
+        const meta = document.createElement("div");
+        meta.style.color = "var(--muted)";
+        meta.style.fontSize = "12px";
+        meta.textContent = `Version: ${FE_VERSION} • Release: ${FE_RELEASE}`;
+
+        const pre = document.createElement("pre");
+        pre.style.margin = "0";
+        pre.style.whiteSpace = "pre-wrap";
+        pre.style.fontSize = "12px";
+        pre.style.lineHeight = "1.45";
+        pre.style.fontFamily =
+          "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
+        pre.textContent = text || "(empty changelog)";
+
+        head.append(h1, meta);
+        host.append(head, pre);
+      },
+    });
+  } catch (e) {
+    coreApi.paneApi.open({
+      title: "Changelog",
+      render: (host) => {
+        host.innerHTML = `<div style="color:var(--muted)">Failed to load /CHANGELOG.md</div>`;
+      },
+    });
+  }
 }
 
 // --------------------
