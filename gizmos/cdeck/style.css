@@ -103,6 +103,7 @@
 .mini:hover {
   border-color: var(--border-2);
 }
+
 .card-dragging {
   opacity: 0.35;
 }
@@ -111,15 +112,8 @@
   outline: 2px solid rgba(255, 106, 0, 0.55);
   outline-offset: 2px;
 }
-.card-dragging {
-  opacity: 0.35;
-}
 
-.lane-drop-hover {
-  outline: 2px solid rgba(255, 106, 0, 0.55);
-  outline-offset: 2px;
-}
-/* Prevent accidental text selection while dragging cards */
+/* Prevent accidental text selection while dragging cards (desktop + mobile) */
 .cdeck,
 .lane,
 .lane-head,
@@ -127,9 +121,10 @@
 .card,
 .card * {
   user-select: none;
+  -webkit-user-select: none;
 }
 
-/* but keep inputs editable */
+/* but keep inputs editable in pane/inspector */
 .pane input,
 .pane textarea,
 .pane select,
@@ -137,5 +132,5 @@
 .inspector,
 .inspector * {
   user-select: text;
+  -webkit-user-select: text;
 }
-
