@@ -176,6 +176,12 @@ function toggleLayoutMode() {
   document.body.dataset.layout = next;
   localStorage.setItem(FE_LAYOUT_KEY, next);
 }
+function updateLayoutButtonLabel() {
+  if (!btnLayout) return;
+  const mode = (document.body.dataset.layout || "compact").toLowerCase();
+  const nice = mode === "wide" ? "Wide" : "Compact";
+  btnLayout.textContent = `Layout: ${nice}`;
+}
 
 // --------------------
 // MANIFEST LOADING
