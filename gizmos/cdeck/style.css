@@ -119,4 +119,23 @@
   outline: 2px solid rgba(255, 106, 0, 0.55);
   outline-offset: 2px;
 }
+/* Prevent accidental text selection while dragging cards */
+.cdeck,
+.lane,
+.lane-head,
+.cards,
+.card,
+.card * {
+  user-select: none;
+}
+
+/* but keep inputs editable */
+.pane input,
+.pane textarea,
+.pane select,
+.pane option,
+.inspector,
+.inspector * {
+  user-select: text;
+}
 
