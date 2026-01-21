@@ -1,6 +1,13 @@
 let unsubCards = null;
 let unsubLanes = null;
 
+const PRIORITIES = [
+  { value: "urgent", label: "Urgent" },
+  { value: "today", label: "Today" },
+  { value: "normal", label: "Normal" },
+  { value: "backlog", label: "Backlog" },
+];
+
 export async function mount(host, ctx) {
   ensureCss("/gizmos/cdeck/style.css");
 
@@ -71,14 +78,13 @@ function renderBody(ctx) {
   const lanesEl = document.createElement("div");
   lanesEl.className = "lanes";
 
-  const lanes = ctx.store.list("lane");
-  const cards = ctx.store.list("card");
+  const lanes = getSortedLanes(ctx);
+  const allCards = ctx.store.list("card");
 
   lanes.forEach((lane) => {
     const laneEl = document.createElement("div");
     laneEl.className = "lane";
 
-    // Required for drag/drop target detection
     laneEl.dataset.laneId = lane.id;
 
     const head = document.createElement("div");
@@ -88,53 +94,70 @@ function renderBody(ctx) {
     const cardsEl = document.createElement("div");
     cardsEl.className = "cards";
 
-    cards
+    const cards = allCards
       .filter((c) => c.lane === lane.id)
-      .forEach((card) => {
-        const el = document.createElement("div");
-        el.className = "card";
-
-        // Drag/drop enabled (click/hold + drag)
-        makeCardDraggable(el, card, ctx);
-
-        const title = document.createElement("div");
-        title.className = "card-title";
-        title.textContent = card.title || "Untitled";
-
-        const meta = document.createElement("div");
-        meta.className = "card-meta";
-        const noteCount = Array.isArray(card.notes) ? card.notes.length : 0;
-        meta.textContent = `Notes: ${noteCount}`;
-
-        const actions = document.createElement("div");
-        actions.className = "card-actions";
-
-        const left = document.createElement("button");
-        left.className = "mini";
-        left.textContent = "←";
-        left.title = "Move left";
-        left.onclick = (e) => {
-          e.stopPropagation();
-          moveCard(card, ctx, -1);
-        };
-
-        const right = document.createElement("button");
-        right.className = "mini";
-        right.textContent = "→";
-        right.title = "Move right";
-        right.onclick = (e) => {
-          e.stopPropagation();
-          moveCard(card, ctx, +1);
-        };
-
-        actions.append(left, right);
-
-        el.append(title, meta, actions);
-
-        el.onclick = () => openCard(card, ctx);
-
-        cardsEl.appendChild(el);
+      .map((c) => normalizeCard(c, ctx))
+      .sort((a, b) => {
+        const aa = Number(a.createdAt || 0);
+        const bb = Number(b.createdAt || 0);
+        if (aa !== bb) return aa - bb; // oldest first, newest at bottom
+        return String(a.title || "").localeCompare(String(b.title || ""));
       });
+
+    cards.forEach((card) => {
+      const el = document.createElement("div");
+      el.className = `card ${priorityClass(card.priority)}`;
+
+      // Drag/drop enabled (click/hold + drag)
+      makeCardDraggable(el, card, ctx);
+
+      const title = document.createElement("div");
+      title.className = "card-title";
+      title.textContent = card.title || "Untitled";
+
+      const meta = document.createElement("div");
+      meta.className = "card-meta";
+      const noteCount = Array.isArray(card.notes) ? card.notes.length : 0;
+      const pr = card.priority ? ` • ${labelPriority(card.priority)}` : "";
+      meta.textContent = `Notes: ${noteCount}${pr}`;
+
+      const actions = document.createElement("div");
+      actions.className = "card-actions";
+
+      const del = document.createElement("button");
+      del.className = "mini danger";
+      del.textContent = "×";
+      del.title = "Delete card";
+      del.onclick = (e) => {
+        e.stopPropagation();
+        openDeleteConfirmPane(card, ctx);
+      };
+
+      const left = document.createElement("button");
+      left.className = "mini";
+      left.textContent = "←";
+      left.title = "Move left";
+      left.onclick = (e) => {
+        e.stopPropagation();
+        moveCard(card, ctx, -1);
+      };
+
+      const right = document.createElement("button");
+      right.className = "mini";
+      right.textContent = "→";
+      right.title = "Move right";
+      right.onclick = (e) => {
+        e.stopPropagation();
+        moveCard(card, ctx, +1);
+      };
+
+      actions.append(del, left, right);
+
+      el.append(title, meta, actions);
+      el.onclick = () => openCard(card, ctx);
+
+      cardsEl.appendChild(el);
+    });
 
     laneEl.append(head, cardsEl);
     lanesEl.appendChild(laneEl);
@@ -142,6 +165,92 @@ function renderBody(ctx) {
 
   body.appendChild(lanesEl);
   return body;
+}
+
+function getSortedLanes(ctx) {
+  // Stable ordering by numeric lane id (0..N). This fixes arrows.
+  return ctx.store
+    .list("lane")
+    .slice()
+    .sort((a, b) => Number(a.id) - Number(b.id));
+}
+
+function normalizeCard(card, ctx) {
+  let changed = false;
+  const out = { ...card };
+
+  // createdAt drives order (new cards should be at bottom)
+  if (out.createdAt == null) {
+    // best guess: first note timestamp, else now
+    const notes = Array.isArray(out.notes) ? out.notes : [];
+    const guess = notes.length ? Number(notes[0].ts || Date.now()) : Date.now();
+    out.createdAt = guess;
+    changed = true;
+  }
+
+  // priority default
+  if (!out.priority) {
+    out.priority = "normal";
+    changed = true;
+  }
+
+  // notes should have stable ids for inline edit
+  const norm = normalizeNotes(out.notes);
+  if (norm.changed) {
+    out.notes = norm.notes;
+    changed = true;
+  }
+
+  if (changed) {
+    ctx.store.mutate({
+      type: "card",
+      op: "put",
+      id: out.id,
+      data: out,
+    });
+  }
+
+  return out;
+}
+
+function normalizeNotes(notes) {
+  const arr = Array.isArray(notes) ? notes.slice() : [];
+  let changed = false;
+
+  const out = arr.map((n) => {
+    const nn = { ...n };
+    if (!nn.id) {
+      nn.id = (crypto?.randomUUID?.() || String(Date.now()) + Math.random().toString(16).slice(2));
+      changed = true;
+    }
+    if (nn.ts == null) {
+      nn.ts = Date.now();
+      changed = true;
+    }
+    if (nn.text == null) {
+      nn.text = "";
+      changed = true;
+    }
+    return nn;
+  });
+
+  return { notes: out, changed };
+}
+
+function priorityClass(p) {
+  const v = String(p || "normal").toLowerCase();
+  if (v === "urgent") return "priority-urgent";
+  if (v === "today") return "priority-today";
+  if (v === "backlog") return "priority-backlog";
+  return "priority-normal";
+}
+
+function labelPriority(p) {
+  const v = String(p || "normal").toLowerCase();
+  if (v === "urgent") return "Urgent";
+  if (v === "today") return "Today";
+  if (v === "backlog") return "Backlog";
+  return "Normal";
 }
 
 function openCreateCardPane(ctx) {
@@ -156,6 +265,7 @@ function openCreateCardPane(ctx) {
         initial: {
           title: "",
           lane: "0",
+          priority: "normal",
           channel: "",
           summary: "",
           nextAction: "",
@@ -165,18 +275,22 @@ function openCreateCardPane(ctx) {
           if (!title) return { ok: false, focus: "title" };
 
           const id = crypto.randomUUID();
+          const now = Date.now();
 
           const notes = [];
-          if (values.summary) notes.push({ ts: Date.now(), text: `Summary: ${values.summary}` });
-          if (values.nextAction) notes.push({ ts: Date.now(), text: `Next: ${values.nextAction}` });
+          if (values.summary) notes.push({ id: crypto.randomUUID(), ts: now, text: `Summary: ${values.summary}` });
+          if (values.nextAction) notes.push({ id: crypto.randomUUID(), ts: now, text: `Next: ${values.nextAction}` });
 
           ctx.store.mutate({
             type: "card",
             op: "put",
             id,
             data: {
+              id,
               title,
               lane: values.lane || "0",
+              priority: values.priority || "normal",
+              createdAt: now,
               channel: values.channel || null,
               summary: values.summary || null,
               nextAction: values.nextAction || null,
@@ -199,7 +313,7 @@ function openCreateCardPane(ctx) {
 }
 
 function moveCard(card, ctx, direction) {
-  const lanes = ctx.store.list("lane");
+  const lanes = getSortedLanes(ctx);
   const idx = lanes.findIndex((l) => l.id === card.lane);
   if (idx === -1) return;
 
@@ -227,10 +341,62 @@ function moveCard(card, ctx, direction) {
   }
 }
 
-function openCard(card, ctx) {
-  ctx.nav.selectCard(card.id, { openPane: true });
+function openDeleteConfirmPane(card, ctx) {
+  const latest = ctx.store.get("card", card.id) || card;
 
-  const fresh = ctx.store.get("card", card.id) || card;
+  ctx.pane.open({
+    title: "Delete card",
+    render: (host) => {
+      host.innerHTML = "";
+
+      const wrap = document.createElement("div");
+      wrap.style.display = "grid";
+      wrap.style.gap = "10px";
+
+      const msg = document.createElement("div");
+      msg.textContent = `Delete "${latest.title || "Untitled"}"?`;
+      msg.style.fontWeight = "700";
+
+      const hint = document.createElement("div");
+      hint.style.color = "var(--muted)";
+      hint.style.fontSize = "12px";
+      hint.textContent = "This removes the card locally. (Undo/trash can comes later.)";
+
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.gap = "8px";
+
+      const del = document.createElement("button");
+      del.className = "btn small";
+      del.textContent = "Delete";
+      del.onclick = () => {
+        ctx.store.mutate({ type: "card", op: "delete", id: latest.id });
+
+        const state = ctx.state.get();
+        if (state.card === latest.id) {
+          ctx.nav.closePane?.() || ctx.pane.close();
+        }
+      };
+
+      const cancel = document.createElement("button");
+      cancel.className = "btn ghost small";
+      cancel.textContent = "Cancel";
+      cancel.onclick = () => openCard(latest, ctx);
+
+      row.append(del, cancel);
+      wrap.append(msg, hint, row);
+      host.appendChild(wrap);
+    },
+  });
+}
+
+function openCard(card, ctx) {
+  // ensure card has createdAt/priority/note ids
+  const normalized = normalizeCard(ctx.store.get("card", card.id) || card, ctx);
+
+  ctx.nav.selectCard(normalized.id, { openPane: true });
+
+  const fresh = ctx.store.get("card", normalized.id) || normalized;
   const laneName = laneLabel(fresh.lane, ctx);
   const notes = Array.isArray(fresh.notes) ? fresh.notes : [];
 
@@ -243,7 +409,7 @@ function openCard(card, ctx) {
       top.style.display = "grid";
       top.style.gap = "10px";
 
-      // Header row: meta + edit
+      // Header row: meta + edit/delete
       const headRow = document.createElement("div");
       headRow.style.display = "flex";
       headRow.style.alignItems = "center";
@@ -254,15 +420,27 @@ function openCard(card, ctx) {
       meta.style.color = "var(--muted)";
       meta.style.fontSize = "12px";
       const channel = fresh.channel ? ` • Channel: ${fresh.channel}` : "";
-      meta.textContent = `Lane: ${laneName}${channel}`;
+      const pr = fresh.priority ? ` • Priority: ${labelPriority(fresh.priority)}` : "";
+      meta.textContent = `Lane: ${laneName}${channel}${pr}`;
+
+      const actions = document.createElement("div");
+      actions.style.display = "flex";
+      actions.style.gap = "8px";
 
       const editBtn = document.createElement("button");
       editBtn.className = "btn ghost small";
       editBtn.textContent = "Edit";
       editBtn.onclick = () => openEditCardPane(fresh, ctx);
 
-      headRow.append(meta, editBtn);
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn ghost small";
+      delBtn.textContent = "Delete";
+      delBtn.onclick = () => openDeleteConfirmPane(fresh, ctx);
 
+      actions.append(editBtn, delBtn);
+      headRow.append(meta, actions);
+
+      // Notes list with inline edit
       const noteList = document.createElement("div");
       noteList.style.display = "grid";
       noteList.style.gap = "8px";
@@ -274,26 +452,11 @@ function openCard(card, ctx) {
         noteList.appendChild(empty);
       } else {
         notes.slice().reverse().forEach((n) => {
-          const row = document.createElement("div");
-          row.style.border = "1px solid var(--border)";
-          row.style.borderRadius = "12px";
-          row.style.padding = "10px";
-          row.style.background = "rgba(255,255,255,0.03)";
-
-          const t = document.createElement("div");
-          t.style.color = "var(--muted)";
-          t.style.fontSize = "12px";
-          t.style.marginBottom = "6px";
-          t.textContent = new Date(n.ts).toLocaleString();
-
-          const b = document.createElement("div");
-          b.textContent = n.text;
-
-          row.append(t, b);
-          noteList.appendChild(row);
+          noteList.appendChild(renderNoteRow(n, fresh, ctx));
         });
       }
 
+      // Add note
       const input = document.createElement("textarea");
       input.placeholder = "Add a note…";
       input.style.width = "100%";
@@ -323,7 +486,7 @@ function openCard(card, ctx) {
 
         const updated = {
           ...latest,
-          notes: [...currentNotes, { ts: Date.now(), text }],
+          notes: [...currentNotes, { id: crypto.randomUUID(), ts: Date.now(), text }],
         };
 
         ctx.store.mutate({
@@ -337,15 +500,99 @@ function openCard(card, ctx) {
       };
 
       addRow.append(add);
-
       top.append(headRow, noteList, input, addRow);
       host.appendChild(top);
     },
   });
 }
 
+function renderNoteRow(note, card, ctx) {
+  const row = document.createElement("div");
+  row.className = "note-row";
+
+  const top = document.createElement("div");
+  top.className = "note-top";
+
+  const ts = document.createElement("div");
+  ts.className = "note-ts";
+  ts.textContent = new Date(note.ts).toLocaleString();
+
+  const actions = document.createElement("div");
+  actions.className = "note-actions";
+
+  const edit = document.createElement("button");
+  edit.className = "note-mini";
+  edit.textContent = "Edit";
+
+  edit.onclick = () => {
+    // swap into inline editor
+    row.innerHTML = "";
+
+    const editor = document.createElement("textarea");
+    editor.style.width = "100%";
+    editor.style.minHeight = "70px";
+    editor.style.borderRadius = "12px";
+    editor.style.border = "1px solid var(--border)";
+    editor.style.background = "rgba(255,255,255,0.03)";
+    editor.style.color = "var(--text)";
+    editor.style.padding = "10px";
+    editor.style.resize = "vertical";
+    editor.value = note.text || "";
+
+    const btnRow = document.createElement("div");
+    btnRow.style.display = "flex";
+    btnRow.style.gap = "8px";
+    btnRow.style.marginTop = "8px";
+
+    const save = document.createElement("button");
+    save.className = "btn small";
+    save.textContent = "Save";
+    save.onclick = () => {
+      const text = (editor.value || "").trim();
+
+      const latest = ctx.store.get("card", card.id) || card;
+      const notes = Array.isArray(latest.notes) ? latest.notes : [];
+
+      const updatedNotes = notes.map((n) =>
+        n.id === note.id ? { ...n, text } : n
+      );
+
+      ctx.store.mutate({
+        type: "card",
+        op: "put",
+        id: card.id,
+        data: { ...latest, notes: updatedNotes },
+      });
+
+      const updatedCard = ctx.store.get("card", card.id) || latest;
+      openCard(updatedCard, ctx);
+    };
+
+    const cancel = document.createElement("button");
+    cancel.className = "btn ghost small";
+    cancel.textContent = "Cancel";
+    cancel.onclick = () => {
+      const latest = ctx.store.get("card", card.id) || card;
+      openCard(latest, ctx);
+    };
+
+    btnRow.append(save, cancel);
+    row.append(editor, btnRow);
+    editor.focus();
+  };
+
+  actions.appendChild(edit);
+  top.append(ts, actions);
+
+  const body = document.createElement("div");
+  body.textContent = note.text;
+
+  row.append(top, body);
+  return row;
+}
+
 function openEditCardPane(card, ctx) {
-  const latest = ctx.store.get("card", card.id) || card;
+  const latest = normalizeCard(ctx.store.get("card", card.id) || card, ctx);
 
   ctx.pane.open({
     title: "Edit card",
@@ -358,6 +605,7 @@ function openEditCardPane(card, ctx) {
         initial: {
           title: latest.title || "",
           lane: latest.lane || "0",
+          priority: latest.priority || "normal",
           channel: latest.channel || "",
           summary: latest.summary || "",
           nextAction: latest.nextAction || "",
@@ -372,6 +620,7 @@ function openEditCardPane(card, ctx) {
             ...fresh,
             title,
             lane: values.lane || fresh.lane || "0",
+            priority: values.priority || fresh.priority || "normal",
             channel: values.channel || null,
             summary: values.summary || null,
             nextAction: values.nextAction || null,
@@ -426,7 +675,7 @@ function buildCardFormUI({ ctx, mode, initial, onSave, onCancel }) {
   const laneSelect = document.createElement("select");
   laneSelect.style = inputStyle;
 
-  const lanes = ctx.store.list("lane");
+  const lanes = getSortedLanes(ctx);
   lanes.forEach((l) => {
     const opt = document.createElement("option");
     opt.value = l.id;
@@ -435,6 +684,22 @@ function buildCardFormUI({ ctx, mode, initial, onSave, onCancel }) {
   });
   laneSelect.value = initial.lane || "0";
   laneWrap.append(laneLabelEl, laneSelect);
+
+  // Priority
+  const prWrap = document.createElement("div");
+  const prLabel = document.createElement("div");
+  prLabel.style = labelStyle;
+  prLabel.textContent = "Priority";
+  const prSelect = document.createElement("select");
+  prSelect.style = inputStyle;
+  PRIORITIES.forEach((p) => {
+    const opt = document.createElement("option");
+    opt.value = p.value;
+    opt.textContent = p.label;
+    prSelect.appendChild(opt);
+  });
+  prSelect.value = initial.priority || "normal";
+  prWrap.append(prLabel, prSelect);
 
   // Channel
   const channelWrap = document.createElement("div");
@@ -495,6 +760,7 @@ function buildCardFormUI({ ctx, mode, initial, onSave, onCancel }) {
     return {
       title: (titleInput.value || "").trim(),
       lane: (laneSelect.value || "").trim(),
+      priority: (prSelect.value || "").trim(),
       channel: (channelSelect.value || "").trim(),
       summary: (summaryInput.value || "").trim(),
       nextAction: (nextInput.value || "").trim(),
@@ -519,7 +785,7 @@ function buildCardFormUI({ ctx, mode, initial, onSave, onCancel }) {
 
   row.append(saveBtn, cancelBtn);
 
-  wrap.append(titleWrap, laneWrap, channelWrap, summaryWrap, nextWrap, row);
+  wrap.append(titleWrap, laneWrap, prWrap, channelWrap, summaryWrap, nextWrap, row);
 
   return {
     el: wrap,
@@ -562,19 +828,14 @@ function makeCardDraggable(cardEl, card, ctx) {
   cardEl.style.touchAction = "none";
 
   cardEl.addEventListener("pointerdown", (e) => {
-    // Only primary pointer
     if (e.button != null && e.button !== 0) return;
-
-    // Prevent fast click-drag from selecting text
-    e.preventDefault();
+    e.preventDefault(); // prevents fast-drag text selection
 
     pointerId = e.pointerId;
     startX = e.clientX;
     startY = e.clientY;
 
-    try {
-      cardEl.setPointerCapture(pointerId);
-    } catch (_) {}
+    try { cardEl.setPointerCapture(pointerId); } catch (_) {}
 
     holdTimer = setTimeout(() => {
       dragging = true;
@@ -590,15 +851,10 @@ function makeCardDraggable(cardEl, card, ctx) {
     const dx = Math.abs(e.clientX - startX);
     const dy = Math.abs(e.clientY - startY);
 
-    if (!dragging && (dx > MOVE_PX || dy > MOVE_PX)) {
-      clearHold();
-    }
-
+    if (!dragging && (dx > MOVE_PX || dy > MOVE_PX)) clearHold();
     if (!dragging) return;
 
-    // Prevent selection while actively dragging
     e.preventDefault();
-
     moveGhost(ghost, e.clientX, e.clientY);
 
     const laneEl = laneFromPoint(e.clientX, e.clientY);
@@ -618,19 +874,12 @@ function makeCardDraggable(cardEl, card, ctx) {
 
       if (laneId && laneId !== card.lane) {
         const fresh = ctx.store.get("card", card.id) || card;
-
         ctx.store.mutate({
           type: "card",
           op: "put",
           id: card.id,
           data: { ...fresh, lane: String(laneId) },
         });
-
-        const state = ctx.state.get();
-        if (state.card === card.id && state.pane) {
-          const updated = ctx.store.get("card", card.id);
-          if (updated) openCard(updated, ctx);
-        }
       }
     }
 
@@ -640,25 +889,15 @@ function makeCardDraggable(cardEl, card, ctx) {
   cardEl.addEventListener("pointercancel", cleanupDrag);
 
   function clearHold() {
-    if (holdTimer) {
-      clearTimeout(holdTimer);
-      holdTimer = null;
-    }
+    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
   }
 
   function cleanupDrag() {
     clearHold();
-
-    if (ghost) {
-      ghost.remove();
-      ghost = null;
-    }
-
+    if (ghost) { ghost.remove(); ghost = null; }
     setLaneHover(currentLaneEl, false);
     currentLaneEl = null;
-
     cardEl.classList.remove("card-dragging");
-
     dragging = false;
     pointerId = null;
   }
