@@ -58,8 +58,6 @@ function renderHeader(ctx) {
   const btn = document.createElement("button");
   btn.className = "btn small";
   btn.textContent = "New card";
-
-  // R3.2: open create form in pane
   btn.onclick = () => openCreateCardPane(ctx);
 
   h.append(title, btn);
@@ -152,127 +150,50 @@ function openCreateCardPane(ctx) {
     render: (host) => {
       host.innerHTML = "";
 
-      const wrap = document.createElement("div");
-      wrap.style.display = "grid";
-      wrap.style.gap = "10px";
+      const ui = buildCardFormUI({
+        ctx,
+        mode: "create",
+        initial: {
+          title: "",
+          lane: "0",
+          channel: "",
+          summary: "",
+          nextAction: "",
+        },
+        onSave: (values) => {
+          const title = (values.title || "").trim();
+          if (!title) return { ok: false, focus: "title" };
 
-      const labelStyle = "font-size:12px; color: var(--muted); margin-bottom:4px;";
-      const inputStyle =
-        "width:100%; border-radius:12px; border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text); padding:10px;";
+          const id = crypto.randomUUID();
 
-      // Title (required)
-      const titleWrap = document.createElement("div");
-      const titleLabel = document.createElement("div");
-      titleLabel.style = labelStyle;
-      titleLabel.textContent = "Title";
-      const titleInput = document.createElement("input");
-      titleInput.type = "text";
-      titleInput.placeholder = "e.g. John Smith — brake pads enquiry";
-      titleInput.style = inputStyle;
-      titleInput.autofocus = true;
-      titleWrap.append(titleLabel, titleInput);
+          const notes = [];
+          if (values.summary) notes.push({ ts: Date.now(), text: `Summary: ${values.summary}` });
+          if (values.nextAction) notes.push({ ts: Date.now(), text: `Next: ${values.nextAction}` });
 
-      // Channel (optional)
-      const channelWrap = document.createElement("div");
-      const channelLabel = document.createElement("div");
-      channelLabel.style = labelStyle;
-      channelLabel.textContent = "Channel (optional)";
-      const channelSelect = document.createElement("select");
-      channelSelect.style = inputStyle;
-      const channels = ["", "Call", "Email", "Walk-in", "Web", "Other"];
-      channels.forEach((c) => {
-        const opt = document.createElement("option");
-        opt.value = c;
-        opt.textContent = c === "" ? "—" : c;
-        channelSelect.appendChild(opt);
-      });
-      channelWrap.append(channelLabel, channelSelect);
+          ctx.store.mutate({
+            type: "card",
+            op: "put",
+            id,
+            data: {
+              title,
+              lane: values.lane || "0",
+              channel: values.channel || null,
+              summary: values.summary || null,
+              nextAction: values.nextAction || null,
+              notes,
+            },
+          });
 
-      // Summary (optional)
-      const summaryWrap = document.createElement("div");
-      const summaryLabel = document.createElement("div");
-      summaryLabel.style = labelStyle;
-      summaryLabel.textContent = "Summary (optional)";
-      const summaryInput = document.createElement("textarea");
-      summaryInput.placeholder = "One-paragraph summary…";
-      summaryInput.style = inputStyle + "min-height:70px; resize:vertical;";
-      summaryWrap.append(summaryLabel, summaryInput);
+          const created = ctx.store.get("card", id);
+          if (created) openCard(created, ctx);
 
-      // Next action (optional)
-      const nextWrap = document.createElement("div");
-      const nextLabel = document.createElement("div");
-      nextLabel.style = labelStyle;
-      nextLabel.textContent = "Next action (optional)";
-      const nextInput = document.createElement("input");
-      nextInput.type = "text";
-      nextInput.placeholder = "e.g. Call back with ETA / send quote";
-      nextInput.style = inputStyle;
-      nextWrap.append(nextLabel, nextInput);
-
-      // Buttons
-      const row = document.createElement("div");
-      row.style.display = "flex";
-      row.style.gap = "8px";
-      row.style.marginTop = "6px";
-
-      const createBtn = document.createElement("button");
-      createBtn.className = "btn small";
-      createBtn.textContent = "Create";
-
-      const cancelBtn = document.createElement("button");
-      cancelBtn.className = "btn ghost small";
-      cancelBtn.textContent = "Cancel";
-      cancelBtn.onclick = () => ctx.nav.closePane?.() || ctx.pane.close();
-
-      // Create action
-      const doCreate = () => {
-        const title = (titleInput.value || "").trim();
-        if (!title) {
-          titleInput.focus();
-          return;
-        }
-
-        const id = crypto.randomUUID();
-        const channel = (channelSelect.value || "").trim();
-        const summary = (summaryInput.value || "").trim();
-        const nextAction = (nextInput.value || "").trim();
-
-        const notes = [];
-        if (summary) notes.push({ ts: Date.now(), text: `Summary: ${summary}` });
-        if (nextAction) notes.push({ ts: Date.now(), text: `Next: ${nextAction}` });
-
-        ctx.store.mutate({
-          type: "card",
-          op: "put",
-          id,
-          data: {
-            title,
-            lane: "0",
-            channel: channel || null,
-            summary: summary || null,
-            nextAction: nextAction || null,
-            notes,
-          },
-        });
-
-        const created = ctx.store.get("card", id);
-        if (created) openCard(created, ctx);
-      };
-
-      createBtn.onclick = doCreate;
-
-      // Enter to create (when focused in title/next input)
-      titleInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") doCreate();
-      });
-      nextInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") doCreate();
+          return { ok: true };
+        },
+        onCancel: () => ctx.nav.closePane?.() || ctx.pane.close(),
       });
 
-      row.append(createBtn, cancelBtn);
-
-      wrap.append(titleWrap, channelWrap, summaryWrap, nextWrap, row);
-      host.appendChild(wrap);
+      host.appendChild(ui.el);
+      ui.focusTitle();
     },
   });
 }
@@ -309,11 +230,12 @@ function moveCard(card, ctx, direction) {
 function openCard(card, ctx) {
   ctx.nav.selectCard(card.id, { openPane: true });
 
-  const laneName = laneLabel(card.lane, ctx);
-  const notes = Array.isArray(card.notes) ? card.notes : [];
+  const fresh = ctx.store.get("card", card.id) || card;
+  const laneName = laneLabel(fresh.lane, ctx);
+  const notes = Array.isArray(fresh.notes) ? fresh.notes : [];
 
   ctx.pane.open({
-    title: card.title,
+    title: fresh.title,
     render: (host) => {
       host.innerHTML = "";
 
@@ -321,11 +243,25 @@ function openCard(card, ctx) {
       top.style.display = "grid";
       top.style.gap = "10px";
 
+      // Header row: meta + edit
+      const headRow = document.createElement("div");
+      headRow.style.display = "flex";
+      headRow.style.alignItems = "center";
+      headRow.style.justifyContent = "space-between";
+      headRow.style.gap = "10px";
+
       const meta = document.createElement("div");
       meta.style.color = "var(--muted)";
       meta.style.fontSize = "12px";
-      const channel = card.channel ? ` • Channel: ${card.channel}` : "";
+      const channel = fresh.channel ? ` • Channel: ${fresh.channel}` : "";
       meta.textContent = `Lane: ${laneName}${channel}`;
+
+      const editBtn = document.createElement("button");
+      editBtn.className = "btn ghost small";
+      editBtn.textContent = "Edit";
+      editBtn.onclick = () => openEditCardPane(fresh, ctx);
+
+      headRow.append(meta, editBtn);
 
       const noteList = document.createElement("div");
       noteList.style.display = "grid";
@@ -369,35 +305,226 @@ function openCard(card, ctx) {
       input.style.padding = "10px";
       input.style.resize = "vertical";
 
+      const addRow = document.createElement("div");
+      addRow.style.display = "flex";
+      addRow.style.gap = "8px";
+      addRow.style.alignItems = "center";
+
       const add = document.createElement("button");
       add.className = "btn small";
       add.textContent = "Add note";
+
       add.onclick = () => {
         const text = (input.value || "").trim();
         if (!text) return;
 
-        const fresh = ctx.store.get("card", card.id);
-        const currentNotes = Array.isArray(fresh?.notes) ? fresh.notes : [];
+        const latest = ctx.store.get("card", fresh.id) || fresh;
+        const currentNotes = Array.isArray(latest?.notes) ? latest.notes : [];
 
         const updated = {
-          ...fresh,
+          ...latest,
           notes: [...currentNotes, { ts: Date.now(), text }],
         };
 
         ctx.store.mutate({
           type: "card",
           op: "put",
-          id: card.id,
+          id: fresh.id,
           data: updated,
         });
 
         openCard(updated, ctx);
       };
 
-      top.append(meta, noteList, input, add);
+      addRow.append(add);
+
+      top.append(headRow, noteList, input, addRow);
       host.appendChild(top);
     },
   });
+}
+
+function openEditCardPane(card, ctx) {
+  const latest = ctx.store.get("card", card.id) || card;
+
+  ctx.pane.open({
+    title: "Edit card",
+    render: (host) => {
+      host.innerHTML = "";
+
+      const ui = buildCardFormUI({
+        ctx,
+        mode: "edit",
+        initial: {
+          title: latest.title || "",
+          lane: latest.lane || "0",
+          channel: latest.channel || "",
+          summary: latest.summary || "",
+          nextAction: latest.nextAction || "",
+        },
+        onSave: (values) => {
+          const title = (values.title || "").trim();
+          if (!title) return { ok: false, focus: "title" };
+
+          const fresh = ctx.store.get("card", latest.id) || latest;
+
+          const updated = {
+            ...fresh,
+            title,
+            lane: values.lane || fresh.lane || "0",
+            channel: values.channel || null,
+            summary: values.summary || null,
+            nextAction: values.nextAction || null,
+          };
+
+          ctx.store.mutate({
+            type: "card",
+            op: "put",
+            id: latest.id,
+            data: updated,
+          });
+
+          openCard(updated, ctx);
+          return { ok: true };
+        },
+        onCancel: () => openCard(latest, ctx),
+      });
+
+      host.appendChild(ui.el);
+      ui.focusTitle();
+    },
+  });
+}
+
+function buildCardFormUI({ ctx, mode, initial, onSave, onCancel }) {
+  const wrap = document.createElement("div");
+  wrap.style.display = "grid";
+  wrap.style.gap = "10px";
+
+  const labelStyle = "font-size:12px; color: var(--muted); margin-bottom:4px;";
+  const inputStyle =
+    "width:100%; border-radius:12px; border:1px solid var(--border); background:rgba(255,255,255,0.03); color:var(--text); padding:10px;";
+
+  // Title
+  const titleWrap = document.createElement("div");
+  const titleLabel = document.createElement("div");
+  titleLabel.style = labelStyle;
+  titleLabel.textContent = "Title";
+  const titleInput = document.createElement("input");
+  titleInput.type = "text";
+  titleInput.placeholder = "e.g. John Smith — brake pads enquiry";
+  titleInput.style = inputStyle;
+  titleInput.value = initial.title || "";
+  titleInput.autofocus = true;
+  titleWrap.append(titleLabel, titleInput);
+
+  // Lane
+  const laneWrap = document.createElement("div");
+  const laneLabelEl = document.createElement("div");
+  laneLabelEl.style = labelStyle;
+  laneLabelEl.textContent = "Lane";
+  const laneSelect = document.createElement("select");
+  laneSelect.style = inputStyle;
+
+  const lanes = ctx.store.list("lane");
+  lanes.forEach((l) => {
+    const opt = document.createElement("option");
+    opt.value = l.id;
+    opt.textContent = l.name;
+    laneSelect.appendChild(opt);
+  });
+  laneSelect.value = initial.lane || "0";
+  laneWrap.append(laneLabelEl, laneSelect);
+
+  // Channel
+  const channelWrap = document.createElement("div");
+  const channelLabel = document.createElement("div");
+  channelLabel.style = labelStyle;
+  channelLabel.textContent = "Channel (optional)";
+  const channelSelect = document.createElement("select");
+  channelSelect.style = inputStyle;
+  const channels = ["", "Call", "Email", "Walk-in", "Web", "Other"];
+  channels.forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c === "" ? "—" : c;
+    channelSelect.appendChild(opt);
+  });
+  channelSelect.value = initial.channel || "";
+  channelWrap.append(channelLabel, channelSelect);
+
+  // Summary
+  const summaryWrap = document.createElement("div");
+  const summaryLabel = document.createElement("div");
+  summaryLabel.style = labelStyle;
+  summaryLabel.textContent = "Summary (optional)";
+  const summaryInput = document.createElement("textarea");
+  summaryInput.placeholder = "One-paragraph summary…";
+  summaryInput.style = inputStyle + "min-height:70px; resize:vertical;";
+  summaryInput.value = initial.summary || "";
+  summaryWrap.append(summaryLabel, summaryInput);
+
+  // Next action
+  const nextWrap = document.createElement("div");
+  const nextLabel = document.createElement("div");
+  nextLabel.style = labelStyle;
+  nextLabel.textContent = "Next action (optional)";
+  const nextInput = document.createElement("input");
+  nextInput.type = "text";
+  nextInput.placeholder = "e.g. Call back with ETA / send quote";
+  nextInput.style = inputStyle;
+  nextInput.value = initial.nextAction || "";
+  nextWrap.append(nextLabel, nextInput);
+
+  // Buttons
+  const row = document.createElement("div");
+  row.style.display = "flex";
+  row.style.gap = "8px";
+  row.style.marginTop = "6px";
+
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "btn small";
+  saveBtn.textContent = mode === "edit" ? "Save" : "Create";
+
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "btn ghost small";
+  cancelBtn.textContent = "Cancel";
+  cancelBtn.onclick = () => onCancel?.();
+
+  function gatherValues() {
+    return {
+      title: (titleInput.value || "").trim(),
+      lane: (laneSelect.value || "").trim(),
+      channel: (channelSelect.value || "").trim(),
+      summary: (summaryInput.value || "").trim(),
+      nextAction: (nextInput.value || "").trim(),
+    };
+  }
+
+  function doSave() {
+    const result = onSave?.(gatherValues());
+    if (result && result.ok === false) {
+      if (result.focus === "title") titleInput.focus();
+    }
+  }
+
+  saveBtn.onclick = doSave;
+
+  titleInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doSave();
+  });
+  nextInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") doSave();
+  });
+
+  row.append(saveBtn, cancelBtn);
+
+  wrap.append(titleWrap, laneWrap, channelWrap, summaryWrap, nextWrap, row);
+
+  return {
+    el: wrap,
+    focusTitle: () => titleInput.focus(),
+  };
 }
 
 function laneLabel(laneId, ctx) {
@@ -435,7 +562,11 @@ function makeCardDraggable(cardEl, card, ctx) {
   cardEl.style.touchAction = "none";
 
   cardEl.addEventListener("pointerdown", (e) => {
+    // Only primary pointer
     if (e.button != null && e.button !== 0) return;
+
+    // Prevent fast click-drag from selecting text
+    e.preventDefault();
 
     pointerId = e.pointerId;
     startX = e.clientX;
@@ -464,6 +595,9 @@ function makeCardDraggable(cardEl, card, ctx) {
     }
 
     if (!dragging) return;
+
+    // Prevent selection while actively dragging
+    e.preventDefault();
 
     moveGhost(ghost, e.clientX, e.clientY);
 
