@@ -132,6 +132,7 @@ function renderBody(ctx) {
         e.stopPropagation();
         openDeleteConfirmPane(card, ctx);
       };
+      wireCardActionButton(del);
 
       const left = document.createElement("button");
       left.className = "mini";
@@ -141,6 +142,7 @@ function renderBody(ctx) {
         e.stopPropagation();
         moveCard(card, ctx, -1);
       };
+      wireCardActionButton(left);
 
       const right = document.createElement("button");
       right.className = "mini";
@@ -150,10 +152,13 @@ function renderBody(ctx) {
         e.stopPropagation();
         moveCard(card, ctx, +1);
       };
+      wireCardActionButton(right);
 
       actions.append(del, left, right);
 
       el.append(title, meta, actions);
+
+      // Card click opens pane. (Buttons above must NEVER bubble into this.)
       el.onclick = () => openCard(card, ctx);
 
       cardsEl.appendChild(el);
@@ -165,6 +170,24 @@ function renderBody(ctx) {
 
   body.appendChild(lanesEl);
   return body;
+}
+
+// R4.3: Make mouse clicks on action buttons NEVER trigger card click (pane open).
+function wireCardActionButton(btn) {
+  // kill “mouse down selects text / becomes card click”
+  btn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  btn.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  // belt + braces
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
 }
 
 function getSortedLanes(ctx) {
@@ -440,7 +463,7 @@ function openCard(card, ctx) {
       actions.append(editBtn, delBtn);
       headRow.append(meta, actions);
 
-      // Notes list with inline edit
+      // Notes list with inline edit + delete
       const noteList = document.createElement("div");
       noteList.style.display = "grid";
       noteList.style.gap = "8px";
@@ -524,6 +547,29 @@ function renderNoteRow(note, card, ctx) {
   edit.className = "note-mini";
   edit.textContent = "Edit";
 
+  const del = document.createElement("button");
+  del.className = "note-mini danger";
+  del.textContent = "Delete";
+
+  del.onclick = () => {
+    const ok = confirm("Delete this note?");
+    if (!ok) return;
+
+    const latest = ctx.store.get("card", card.id) || card;
+    const notes = Array.isArray(latest.notes) ? latest.notes : [];
+    const updatedNotes = notes.filter((n) => n.id !== note.id);
+
+    ctx.store.mutate({
+      type: "card",
+      op: "put",
+      id: card.id,
+      data: { ...latest, notes: updatedNotes },
+    });
+
+    const updatedCard = ctx.store.get("card", card.id) || latest;
+    openCard(updatedCard, ctx);
+  };
+
   edit.onclick = () => {
     // swap into inline editor
     row.innerHTML = "";
@@ -581,7 +627,7 @@ function renderNoteRow(note, card, ctx) {
     editor.focus();
   };
 
-  actions.appendChild(edit);
+  actions.append(edit, del);
   top.append(ts, actions);
 
   const body = document.createElement("div");
