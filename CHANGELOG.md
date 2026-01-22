@@ -1,5 +1,19 @@
 # FreedomEngine — Changelog
 
+## FE.01.A1.R4.3 — Interaction & Navigation Clarity
+
+- Fixed mouse left/right arrow behaviour (no accidental pane opening)
+- Improved card action visibility and delete affordance
+- Added inline delete for individual card notes
+- Active Space is now clearly indicated (theme-aware)
+- No persistence or schema changes
+
+Not included:
+- Multi-user live presence
+- Permissions
+- Undo / trash recovery
+
+
 ## FE.01.A1.R4.2 — C-Deck Priority + Ordering + Inline Note Edit
 - Priority added to cards (Urgent/Today/Normal/Backlog) with coloured strip signifier
 - New cards append to bottom (createdAt ordering)
