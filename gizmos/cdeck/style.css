@@ -124,8 +124,15 @@ body[data-theme="light"] .card.priority-backlog::before { background: rgba(0,0,0
   font-size: 12px;
 }
 
-.mini:hover {
+/* R4.3: more obvious controls */
+.card-actions .mini {
   border-color: var(--border-2);
+  background: rgba(255,255,255,0.10);
+}
+
+.card-actions .mini:hover {
+  border-color: var(--border-2);
+  background: rgba(255,255,255,0.18);
 }
 
 /* delete button */
@@ -137,6 +144,16 @@ body[data-theme="light"] .card.priority-backlog::before { background: rgba(0,0,0
   display: grid;
   place-items: center;
   font-size: 14px;
+
+  /* R4.3: red outline */
+  border-color: rgba(239, 68, 68, 0.85);
+  color: #ef4444;
+  background: rgba(255,255,255,0.06);
+}
+
+.mini.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.95);
 }
 
 /* drag */
@@ -211,4 +228,19 @@ body[data-theme="light"] .lane-drop-hover {
   padding: 4px 8px;
   cursor: pointer;
   font-size: 12px;
+}
+
+.note-mini:hover {
+  border-color: var(--border-2);
+}
+
+/* R4.3: note delete affordance */
+.note-mini.danger {
+  border-color: rgba(239, 68, 68, 0.85);
+  color: #ef4444;
+}
+
+.note-mini.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.95);
 }
