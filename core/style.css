@@ -169,22 +169,41 @@ body {
   gap: 8px;
   padding: 8px 10px;
 
-  /* keep pill tabs, but more "rectangular" feel via border clarity */
   border-radius: 999px;
   border: 1px solid var(--pill-border);
-  background: var(--pill);
+
+  /* R4.3: lighten space tabs */
+  background: rgba(255,255,255,0.18);
+
   color: var(--text);
   cursor: pointer;
   user-select: none;
   transition: transform 0.05s ease, border-color 0.1s ease, background 0.1s ease;
 }
 
+body[data-theme="light"] .space-tab {
+  background: rgba(255,255,255,0.85);
+}
+
+body[data-theme="dark"] .space-tab {
+  background: rgba(255,255,255,0.08);
+}
+
 .space-tab:hover { border-color: var(--border-2); }
 .space-tab:active { transform: translateY(1px); }
 
+/* R4.3: active space is clearly outlined (theme-aware) */
 .space-tab[data-active="1"] {
-  background: rgba(255,255,255,0.12);
-  border-color: var(--border-2);
+  background: transparent;
+  border-width: 2px;
+}
+
+body[data-theme="light"] .space-tab[data-active="1"] {
+  border-color: rgba(107, 92, 255, 0.70);
+}
+
+body[data-theme="dark"] .space-tab[data-active="1"] {
+  border-color: rgba(255, 106, 0, 0.85);
 }
 
 .space-icon {
@@ -246,7 +265,6 @@ body {
   height: 100%;
   min-height: 0;
 
-  /* keep rectangular shape */
   border: 1px solid var(--border);
   border-radius: var(--radius);
 
@@ -428,7 +446,6 @@ body.pane-open .pane {
 @media (max-width: 980px) {
   .main { grid-template-columns: 1fr; }
 
-  /* On mobile, keep the pane as a normal stacked section */
   .pane {
     position: relative;
     top: auto;
@@ -453,6 +470,7 @@ body.pane-open .pane {
 
   .inspector { right: 10px; left: 10px; width: auto; }
 }
+
 /* ===============================
    Dark theme <select> fix
    =============================== */
