@@ -1,5 +1,24 @@
 # FreedomEngine — Changelog
 
+## FE.01.A2.R5 — Live World MVP (Offline-first Sync)
+
+**Goal:** same world can be open on two devices and stay in sync, with minimal presence.
+
+- Added Supabase-backed "Live World" sync layer (cards + lanes)
+- Offline-first preserved: UI still reads/writes locally first
+- Resync loop: local journal tail replays to Supabase when back online
+- Realtime subscriptions: remote edits flow in silently (no modals)
+- Status pill now reflects: Local / Offline / Syncing / Live / Degraded
+- Added migration SQL for Live World tables (supabase/migrations/001_r5_live_world.sql)
+- Added build step to generate runtime env (core/runtime-env.js) from Vercel env vars
+
+Not included:
+- Operator logins + avatars
+- “Editing…” indicators
+- Permissions/teams
+- Analytics
+
+
 ## FE.01.A1.R4.3 — Interaction & Navigation Clarity
 
 - Fixed mouse left/right arrow behaviour (no accidental pane opening)

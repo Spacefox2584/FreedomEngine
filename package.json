@@ -1,0 +1,11 @@
+{
+  "name": "freedomengine",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "FreedomEngine (FE) — browser-native shell",
+  "scripts": {
+    "build": "node scripts/build-env.js",
+    "dev": "python -m http.server 4173 --directory ."
+  }
+}
