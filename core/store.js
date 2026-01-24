@@ -16,6 +16,13 @@ let lastSnapshotUptoSeq = -1;
 let actionsSinceSnapshot = 0;
 let snapshotInFlight = false;
 
+// R5: optional hook for sync layer (push mutations to Supabase)
+let mutationHook = null;
+
+export function setMutationHook(fn) {
+  mutationHook = typeof fn === "function" ? fn : null;
+}
+
 // Tuning (safe defaults)
 const SNAPSHOT_EVERY_ACTIONS = 50;
 const SNAPSHOT_MAX_JOURNAL_TAIL = 200;
@@ -61,15 +68,50 @@ export function subscribe(type, fn) {
 export async function mutate(action) {
   // Ensure deterministic timestamps across replay:
   // if a record is being put, we stamp updated_at into the data so replay restores identical values.
-  const stamped = stampAction(action);
+  const stamped = stampAction({
+    ...action,
+    meta: {
+      ...(action?.meta || {}),
+      source: action?.meta?.source || "local",
+    },
+  });
+
+  // Tag as local unless caller provided meta
+  if (!stamped.meta) stamped.meta = {};
+  if (!stamped.meta.source) stamped.meta.source = "local";
 
   // Write-ahead (durable), then apply to memory
   const entry = await appendAction(stamped);
   applyAction(stamped);
 
+  // Notify sync layer (never blocks UI)
+  try {
+    mutationHook?.({ action: stamped, seq: entry.seq });
+  } catch (_) {}
+
   actionsSinceSnapshot++;
 
   // Background snapshot if needed (never blocks UI)
+  maybeSnapshot(entry.seq).catch(() => {});
+}
+
+/**
+ * R5: Ingest a mutation that originated from the network.
+ * We record it in the local journal so the device stays offline-capable,
+ * but we do NOT call the mutation hook (to avoid push loops).
+ */
+export async function ingestRemote(action) {
+  const stamped = stampAction({
+    ...action,
+    meta: {
+      ...(action?.meta || {}),
+      source: "remote",
+    },
+  });
+
+  const entry = await appendAction(stamped);
+  applyAction(stamped);
+  actionsSinceSnapshot++;
   maybeSnapshot(entry.seq).catch(() => {});
 }
 

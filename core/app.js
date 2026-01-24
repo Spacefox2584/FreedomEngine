@@ -3,13 +3,14 @@ import { createPaneController } from "./pane.js";
 import { loadManifest } from "./gizmoLoader.js";
 import { createSpaceManager } from "./spaceManager.js";
 import * as Store from "./store.js";
+import { initLiveWorld } from "./liveSync.js";
 
 // ====================
 // FE META (R4)
 // ====================
 // Keep this boring and edit it when you tag a release.
-const FE_RELEASE = "FE.01.A1.R4";
-const FE_VERSION = "0.1.x";
+const FE_RELEASE = "FE.01.A2.R5";
+const FE_VERSION = "0.1.0";
 
 // Where feedback should go. Change this to your business email.
 const FE_FEEDBACK_EMAIL = "ops@freedomengine.io";
@@ -39,6 +40,10 @@ const elPaneBody = document.getElementById("fe-pane-body");
 const elPaneClose = document.getElementById("fe-pane-close");
 const elRouteHint = document.getElementById("fe-route-hint");
 const btnTheme = document.getElementById("fe-toggle-theme");
+
+// R5: status indicator (Local / Offline / Syncing / Live)
+const elStatus = document.getElementById("fe-status");
+const elStatusText = elStatus?.querySelector?.(".status-text") || null;
 
 // R3.2 buttons
 const btnChangelog = document.getElementById("fe-btn-changelog");
@@ -132,6 +137,19 @@ async function boot() {
   });
 
   await Store.initStore();
+
+  // R5: Live World sync (Supabase-backed, offline-first).
+  // If Supabase env isn't set, FE remains local and stable.
+  await initLiveWorld({
+    setStatusText: (txt) => {
+      if (elStatusText) elStatusText.textContent = txt || "Local";
+      if (elStatus) {
+        const t = String(txt || "").toLowerCase();
+        elStatus.dataset.mode = t;
+      }
+    },
+  });
+
   await loadAllManifests();
 
   const fromUrl = parseUrlState();
