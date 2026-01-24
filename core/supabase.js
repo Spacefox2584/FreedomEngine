@@ -1,28 +1,31 @@
 // core/supabase.js
-// R5: Minimal Supabase client bootstrap (ESM via CDN)
+// R5: Supabase client bootstrap (ESM via CDN)
 //
-// NOTE:
-// jsDelivr's "+esm" wrapper can change export shapes over time.
-// We avoid named imports and instead read createClient from the default export.
-// This prevents "does not provide an export named createClient" crashes
-// (which can show up in incognito / fresh cache).
+// WHY THIS FILE EXISTS:
+// - Incognito / fresh cache was crashing because jsDelivr "+esm" export shapes changed.
+// - Supabase v2 ESM does NOT guarantee a stable "default" export via wrappers.
+// - So we import the entire module namespace and locate createClient safely.
+//
+// RESULT:
+// - No more "does not provide an export named createClient/default" crashes.
+// - FE can boot consistently across normal/incognito/new devices.
 
-import SupabasePkg from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import * as SupabaseNS from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-function resolveCreateClient() {
-  // jsDelivr +esm often provides a default export object.
-  const candidate =
-    SupabasePkg?.createClient ||
-    SupabasePkg?.default?.createClient ||
+function pickCreateClient() {
+  // Depending on wrapper behaviour, createClient may exist at top-level,
+  // or nested under a default export (rare, but handle it).
+  const fn =
+    SupabaseNS?.createClient ||
+    SupabaseNS?.default?.createClient ||
     null;
 
-  if (typeof candidate !== "function") {
+  if (typeof fn !== "function") {
     throw new Error(
-      "Supabase createClient not available from CDN module. The CDN export shape changed."
+      "Supabase createClient not found in CDN module. The CDN export shape changed."
     );
   }
-
-  return candidate;
+  return fn;
 }
 
 export function getRuntimeEnv() {
@@ -37,24 +40,21 @@ export function getRuntimeEnv() {
 export function createSupabaseClient() {
   const { url, anonKey } = getRuntimeEnv();
 
+  // Fail-safe: FE can still run local if env vars are missing.
   if (!url || !anonKey) {
     return {
       ok: false,
       client: null,
       error:
-        "Supabase env not set. Add SUPABASE_URL and SUPABASE_ANON_KEY via Vercel env vars (or core/runtime-env.js for local dev).",
+        "Supabase env not set. Add SUPABASE_URL and SUPABASE_ANON_KEY via Vercel env vars (Production/Preview) or core/runtime-env.js for local dev.",
     };
   }
 
   let createClient;
   try {
-    createClient = resolveCreateClient();
+    createClient = pickCreateClient();
   } catch (e) {
-    return {
-      ok: false,
-      client: null,
-      error: String(e?.message || e),
-    };
+    return { ok: false, client: null, error: String(e?.message || e) };
   }
 
   const client = createClient(url, anonKey, {
