@@ -1,7 +1,29 @@
 // core/supabase.js
 // R5: Minimal Supabase client bootstrap (ESM via CDN)
+//
+// NOTE:
+// jsDelivr's "+esm" wrapper can change export shapes over time.
+// We avoid named imports and instead read createClient from the default export.
+// This prevents "does not provide an export named createClient" crashes
+// (which can show up in incognito / fresh cache).
 
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import SupabasePkg from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+function resolveCreateClient() {
+  // jsDelivr +esm often provides a default export object.
+  const candidate =
+    SupabasePkg?.createClient ||
+    SupabasePkg?.default?.createClient ||
+    null;
+
+  if (typeof candidate !== "function") {
+    throw new Error(
+      "Supabase createClient not available from CDN module. The CDN export shape changed."
+    );
+  }
+
+  return candidate;
+}
 
 export function getRuntimeEnv() {
   const env = window.FE_ENV || {};
@@ -21,6 +43,17 @@ export function createSupabaseClient() {
       client: null,
       error:
         "Supabase env not set. Add SUPABASE_URL and SUPABASE_ANON_KEY via Vercel env vars (or core/runtime-env.js for local dev).",
+    };
+  }
+
+  let createClient;
+  try {
+    createClient = resolveCreateClient();
+  } catch (e) {
+    return {
+      ok: false,
+      client: null,
+      error: String(e?.message || e),
     };
   }
 
