@@ -40,6 +40,31 @@ export async function appendAction(action) {
   return entry;
 }
 
+/**
+ * R5: Scan journal entries from a minimum seq (inclusive) and stream entries to a callback.
+ * This is used for offline-first resync: we replay local mutations to Supabase when online.
+ */
+export async function scanJournalFrom(minSeq, onEntry) {
+  const tx = db.transaction("journal", "readonly");
+  const store = tx.objectStore("journal");
+  const range = typeof minSeq === "number" ? IDBKeyRange.lowerBound(minSeq) : null;
+
+  return new Promise((resolve) => {
+    const req = store.openCursor(range);
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (cursor) {
+        try {
+          onEntry?.(cursor.value);
+        } catch (_) {}
+        cursor.continue();
+      } else {
+        resolve();
+      }
+    };
+  });
+}
+
 export async function replayJournal(applyFn) {
   return replayJournalFrom(0, applyFn);
 }
