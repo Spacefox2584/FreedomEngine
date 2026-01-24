@@ -43,10 +43,6 @@ const btnTheme = document.getElementById("fe-toggle-theme");
 
 // R5: status indicator (Local / Offline / Syncing / Live)
 const elStatus = document.getElementById("fe-status");
-const elStatusText = document.querySelector("#fe-status .status-text");
-
-// R5: status indicator (Local / Offline / Syncing / Live)
-const elStatus = document.getElementById("fe-status");
 const elStatusText = elStatus?.querySelector?.(".status-text") || null;
 
 // R3.2 buttons
