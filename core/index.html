@@ -96,11 +96,16 @@
 
     <!--
       R5: Runtime env injection (generated at build/deploy time).
-      This keeps Supabase URLs/keys out of the repo and lets Vercel env vars drive stage/prod.
+      This keeps Supabase URLs/keys out of the repo and lets Vercel env vars drive prod.
     -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    <script src="./supabase.js"></script>
+
+    <!-- ✅ Load Supabase UMD build (stable in browsers; no ESM wrapper roulette) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+    <!-- ✅ FE runtime env (window.FE_ENV) -->
     <script src="./runtime-env.js"></script>
+
+    <!-- ✅ Boot FE -->
     <script type="module" src="./app.js"></script>
   </body>
 </html>
