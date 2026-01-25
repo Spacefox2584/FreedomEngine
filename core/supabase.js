@@ -1,43 +1,53 @@
 // core/supabase.js
-// R5 — Browser-safe Supabase bootstrap (NO ESM, NO jsDelivr, NO Node)
+// R5 — Supabase client bootstrap for browser-native FE
+//
+// IMPORTANT:
+// - We DO NOT import Supabase as an ES module (CDN +esm is unstable and can break).
+// - We load the UMD build in core/index.html, which provides window.supabase.
+// - This file stays an ES module because liveSync imports createSupabaseClient from it.
 
-// This file assumes Supabase is loaded globally via <script>
-// It exposes window.FE_SUPABASE for the rest of FE to use
+export function getRuntimeEnv() {
+  const env = window.FE_ENV || {};
+  return {
+    url: String(env.SUPABASE_URL || "https://snspeeohcnjtbisexwxp.supabase.co").trim(),
+    anonKey: String(env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuc3BlZW9oY25qdGJpc2V4d3hwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjMyNjUsImV4cCI6MjA4NDYzOTI2NX0.VSm29h9luLDAqQCoRfUp0JtqcG_4D-qCdyEnS9duijM").trim(),
+    name: String(env.FE_ENV_NAME || "prod").trim() || "unknown",
+  };
+}
 
-(function () {
-  // ---- CONFIG ----
-  const SUPABASE_URL = "https://snspeeohcnjtbisexwxp.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuc3BlZW9oY25qdGJpc2V4d3hwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjMyNjUsImV4cCI6MjA4NDYzOTI2NX0.VSm29h9luLDAqQCoRfUp0JtqcG_4D-qCdyEnS9duijM";
+export function createSupabaseClient() {
+  const { url, anonKey } = getRuntimeEnv();
 
-  // ---- GUARD ----
-  if (!window.supabase) {
-    console.error(
-      "[FE] Supabase library not found. " +
-      "Did you forget to include the Supabase <script> tag?"
-    );
-    return;
+  if (!url || !anonKey) {
+    return {
+      ok: false,
+      client: null,
+      error:
+        "Supabase env not set. Missing SUPABASE_URL or SUPABASE_ANON_KEY in window.FE_ENV (runtime-env.js).",
+    };
   }
 
-  // ---- CREATE CLIENT ----
-  const client = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY,
-    {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: false
+  if (!window.supabase || typeof window.supabase.createClient !== "function") {
+    return {
+      ok: false,
+      client: null,
+      error:
+        "Supabase UMD library not loaded. core/index.html must include the supabase.min.js script before app.js.",
+    };
+  }
+
+  const client = window.supabase.createClient(url, anonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
       },
-      realtime: {
-        params: {
-          eventsPerSecond: 10
-        }
-      }
-    }
-  );
+    },
+  });
 
-  // ---- EXPOSE ----
-  window.FE_SUPABASE = client;
-
-  console.log("[FE] Supabase client initialised");
-})();
+  return { ok: true, client, error: null };
+}
