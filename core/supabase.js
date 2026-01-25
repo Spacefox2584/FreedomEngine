@@ -1,74 +1,43 @@
 // core/supabase.js
-// R5: Supabase client bootstrap (ESM via CDN)
-//
-// WHY THIS FILE EXISTS:
-// - Incognito / fresh cache was crashing because jsDelivr "+esm" export shapes changed.
-// - Supabase v2 ESM does NOT guarantee a stable "default" export via wrappers.
-// - So we import the entire module namespace and locate createClient safely.
-//
-// RESULT:
-// - No more "does not provide an export named createClient/default" crashes.
-// - FE can boot consistently across normal/incognito/new devices.
+// R5 — Browser-safe Supabase bootstrap (NO ESM, NO jsDelivr, NO Node)
 
-import * as SupabaseNS from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+// This file assumes Supabase is loaded globally via <script>
+// It exposes window.FE_SUPABASE for the rest of FE to use
 
-function pickCreateClient() {
-  // Depending on wrapper behaviour, createClient may exist at top-level,
-  // or nested under a default export (rare, but handle it).
-  const fn =
-    SupabaseNS?.createClient ||
-    SupabaseNS?.default?.createClient ||
-    null;
+(function () {
+  // ---- CONFIG ----
+  const SUPABASE_URL = "https://snspeeohcnjtbisexwxp.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuc3BlZW9oY25qdGJpc2V4d3hwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjMyNjUsImV4cCI6MjA4NDYzOTI2NX0.VSm29h9luLDAqQCoRfUp0JtqcG_4D-qCdyEnS9duijM";
 
-  if (typeof fn !== "function") {
-    throw new Error(
-      "Supabase createClient not found in CDN module. The CDN export shape changed."
+  // ---- GUARD ----
+  if (!window.supabase) {
+    console.error(
+      "[FE] Supabase library not found. " +
+      "Did you forget to include the Supabase <script> tag?"
     );
-  }
-  return fn;
-}
-
-export function getRuntimeEnv() {
-  const env = window.FE_ENV || {};
-  return {
-    url: String(env.SUPABASE_URL || "").trim(),
-    anonKey: String(env.SUPABASE_ANON_KEY || "").trim(),
-    name: String(env.FE_ENV_NAME || "").trim() || "unknown",
-  };
-}
-
-export function createSupabaseClient() {
-  const { url, anonKey } = getRuntimeEnv();
-
-  // Fail-safe: FE can still run local if env vars are missing.
-  if (!url || !anonKey) {
-    return {
-      ok: false,
-      client: null,
-      error:
-        "Supabase env not set. Add SUPABASE_URL and SUPABASE_ANON_KEY via Vercel env vars (Production/Preview) or core/runtime-env.js for local dev.",
-    };
+    return;
   }
 
-  let createClient;
-  try {
-    createClient = pickCreateClient();
-  } catch (e) {
-    return { ok: false, client: null, error: String(e?.message || e) };
-  }
-
-  const client = createClient(url, anonKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-    realtime: {
-      params: {
-        eventsPerSecond: 8,
+  // ---- CREATE CLIENT ----
+  const client = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
+    {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false
       },
-    },
-  });
+      realtime: {
+        params: {
+          eventsPerSecond: 10
+        }
+      }
+    }
+  );
 
-  return { ok: true, client, error: null };
-}
+  // ---- EXPOSE ----
+  window.FE_SUPABASE = client;
+
+  console.log("[FE] Supabase client initialised");
+})();
