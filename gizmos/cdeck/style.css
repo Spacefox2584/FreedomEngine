@@ -76,20 +76,40 @@
   content: "";
   position: absolute;
   left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 4px;
+  top: 6px;
+  bottom: 6px;
+  width: 6px;
   border-radius: 999px;
   opacity: 0.95;
   background: rgba(255,255,255,0.15); /* default */
 }
 
 .card.priority-urgent::before { background: #ef4444; }
-.card.priority-today::before { background: #f59e0b; }
-.card.priority-normal::before { background: #3b82f6; }
-.card.priority-backlog::before { background: rgba(255,255,255,0.20); }
+.card.priority-normal::before { background: #a855f7; }
+.card.priority-backlog::before { background: rgba(255,255,255,0.18); }
 
-body[data-theme="light"] .card.priority-backlog::before { background: rgba(0,0,0,0.18); }
+
+
+/* Priority shadows (R5 polish)
+   Urgent: most obvious
+   Normal: restrained
+   Backlog: recedes */
+.card.priority-urgent {
+  box-shadow: 0 10px 28px rgba(239,68,68,0.22);
+}
+.card.priority-normal {
+  box-shadow: 0 10px 24px rgba(168,85,247,0.16);
+}
+.card.priority-backlog {
+  box-shadow: none;
+  opacity: 0.92;
+  background: rgba(255,255,255,0.025);
+}
+body[data-theme="light"] .card.priority-backlog {
+  opacity: 0.95;
+  background: rgba(0,0,0,0.015);
+}
+body[data-theme="light"] .card.priority-backlog::before { background: rgba(0,0,0,0.22); }
 
 .card:hover {
   border-color: var(--border-2);

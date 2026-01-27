@@ -3,10 +3,18 @@ let unsubLanes = null;
 
 const PRIORITIES = [
   { value: "urgent", label: "Urgent" },
-  { value: "today", label: "Today" },
   { value: "normal", label: "Normal" },
   { value: "backlog", label: "Backlog" },
 ];
+
+function normalizePriority(p) {
+  const v = String(p || "normal").toLowerCase();
+  if (v === "urgent") return "urgent";
+  if (v === "backlog") return "backlog";
+  // legacy values like "today" collapse to normal
+  return "normal";
+}
+
 
 export async function mount(host, ctx) {
   ensureCss("/gizmos/cdeck/style.css");
@@ -261,17 +269,15 @@ function normalizeNotes(notes) {
 }
 
 function priorityClass(p) {
-  const v = String(p || "normal").toLowerCase();
+  const v = normalizePriority(p);
   if (v === "urgent") return "priority-urgent";
-  if (v === "today") return "priority-today";
   if (v === "backlog") return "priority-backlog";
   return "priority-normal";
 }
 
 function labelPriority(p) {
-  const v = String(p || "normal").toLowerCase();
+  const v = normalizePriority(p);
   if (v === "urgent") return "Urgent";
-  if (v === "today") return "Today";
   if (v === "backlog") return "Backlog";
   return "Normal";
 }
@@ -312,7 +318,7 @@ function openCreateCardPane(ctx) {
               id,
               title,
               lane: values.lane || "0",
-              priority: values.priority || "normal",
+              priority: normalizePriority(values.priority || "normal"),
               createdAt: now,
               channel: values.channel || null,
               summary: values.summary || null,
@@ -651,7 +657,7 @@ function openEditCardPane(card, ctx) {
         initial: {
           title: latest.title || "",
           lane: latest.lane || "0",
-          priority: latest.priority || "normal",
+          priority: normalizePriority(latest.priority || "normal"),
           channel: latest.channel || "",
           summary: latest.summary || "",
           nextAction: latest.nextAction || "",
@@ -806,7 +812,7 @@ function buildCardFormUI({ ctx, mode, initial, onSave, onCancel }) {
     return {
       title: (titleInput.value || "").trim(),
       lane: (laneSelect.value || "").trim(),
-      priority: (prSelect.value || "").trim(),
+      priority: normalizePriority((prSelect.value || "").trim()),
       channel: (channelSelect.value || "").trim(),
       summary: (summaryInput.value || "").trim(),
       nextAction: (nextInput.value || "").trim(),

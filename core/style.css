@@ -393,6 +393,14 @@ body.pane-open .pane {
 .btn:hover { border-color: var(--border-2); }
 .btn.ghost { background: transparent; }
 
+/* Ghost hover states (top-right pills etc.) */
+.btn.ghost:hover {
+  background: rgba(255,255,255,0.06);
+}
+body[data-theme="light"] .btn.ghost:hover {
+  background: rgba(0,0,0,0.04);
+}
+
 .btn.small {
   padding: 8px 10px;
   border-radius: 10px;

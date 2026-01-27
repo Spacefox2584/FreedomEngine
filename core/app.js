@@ -20,6 +20,7 @@ const FE_CHANGELOG_URL = "/CHANGELOG.md";
 
 // R4 layout key
 const FE_LAYOUT_KEY = "fe.layout"; // "compact" | "wide"
+const FE_THEME_KEY = \"fe.theme\"; // \"dark\" | \"light\"
 
 // --------------------
 // MANIFESTS
@@ -115,10 +116,13 @@ async function boot() {
   initLayoutMode();
   btnLayout?.addEventListener("click", () => toggleLayoutMode());
 
-  // Theme toggle
+  // Theme (default: dark unless user saved a preference)
+  const savedTheme = getSavedTheme();
+  applyTheme(savedTheme || "dark");
+
   btnTheme.addEventListener("click", () => {
-    document.body.dataset.theme =
-      document.body.dataset.theme === "dark" ? "light" : "dark";
+    const next = document.body.dataset.theme === "dark" ? "light" : "dark";
+    applyTheme(next);
   });
 
   // Changelog
@@ -135,6 +139,17 @@ async function boot() {
     await Store.snapshotNow();
     if (isInspectorOpen()) await refreshInspector();
   });
+  // Close right pane when clicking outside it (R5 polish)
+  document.addEventListener("mousedown", (e) => {
+    if (!pane.isOpen()) return;
+    const paneEl = document.getElementById("fe-pane");
+    if (!paneEl) return;
+    if (paneEl.contains(e.target)) return;
+    // If clicking a card, the card handler will reopen pane immediately.
+    pane.close();
+    document.body.classList.remove("pane-open");
+  });
+
 
   await Store.initStore();
 
@@ -185,7 +200,7 @@ function initLayoutMode() {
     updateLayoutButtonLabel();
     return;
   }
-  const auto = window.innerWidth >= 1280 ? "wide" : "compact";
+  const auto = "compact";
   document.body.dataset.layout = auto;
   updateLayoutButtonLabel();
 }
@@ -202,6 +217,29 @@ function updateLayoutButtonLabel() {
   const mode = (document.body.dataset.layout || "compact").toLowerCase();
   const nice = mode === "wide" ? "Wide" : "Compact";
   btnLayout.textContent = `Layout: ${nice}`;
+}
+
+
+// --------------------
+// THEME (R5 polish)
+// --------------------
+function getSavedTheme() {
+  const t = localStorage.getItem(FE_THEME_KEY);
+  return t === "light" || t === "dark" ? t : null;
+}
+
+function applyTheme(theme) {
+  const t = theme === "light" ? "light" : "dark";
+  document.body.dataset.theme = t;
+  localStorage.setItem(FE_THEME_KEY, t);
+  updateThemeButton();
+}
+
+function updateThemeButton() {
+  if (!btnTheme) return;
+  const t = document.body.dataset.theme === "light" ? "light" : "dark";
+  // Reflect the current theme clearly.
+  btnTheme.textContent = t === "dark" ? "Theme: Dark" : "Theme: Light";
 }
 
 // --------------------

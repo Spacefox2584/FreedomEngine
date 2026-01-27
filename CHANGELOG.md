@@ -1,5 +1,18 @@
 # FreedomEngine — Changelog
 
+## FE.01.A2.R5.3 — C-Deck UI Polish
+- Right pane closes when clicking outside it
+- Default theme is Dark; theme button reflects current theme
+- Default layout is Compact (unless user saved preference)
+- C-Deck priorities reduced to 3 states: Urgent / Normal / Backlog (legacy values collapse to Normal)
+- Card visuals updated:
+  - Urgent: most obvious (red strip + stronger shadow)
+  - Normal: restrained (purple strip + lighter shadow)
+  - Backlog: recedes (neutral strip + reduced emphasis)
+- Priority strip thicker
+- Card delete (×) button is circular; white/neutral by default, red on hover
+- Top-right pill buttons have clearer hover states
+
 ## FE.01.A2.R5
 - Added FE_DEFAULT_WORLD_ID support to force a shared default world across devices (fixes normal vs incognito world mismatch). — Live World MVP (Offline-first Sync)
 
