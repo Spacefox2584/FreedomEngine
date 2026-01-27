@@ -1,6 +1,7 @@
 # FreedomEngine — Changelog
 
-## FE.01.A2.R5 — Live World MVP (Offline-first Sync)
+## FE.01.A2.R5
+- Added FE_DEFAULT_WORLD_ID support to force a shared default world across devices (fixes normal vs incognito world mismatch). — Live World MVP (Offline-first Sync)
 
 **Goal:** same world can be open on two devices and stay in sync, with minimal presence.
 
@@ -9,7 +10,6 @@
 - Resync loop: local journal tail replays to Supabase when back online
 - Realtime subscriptions: remote edits flow in silently (no modals)
 - Status pill now reflects: Local / Offline / Syncing / Live / Degraded
-- New devices now join the same shared default world automatically (fixes incognito/phone seeing an empty board)
 - Added migration SQL for Live World tables (supabase/migrations/001_r5_live_world.sql)
 - Added build step to generate runtime env (core/runtime-env.js) from Vercel env vars
 
