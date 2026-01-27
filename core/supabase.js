@@ -2,16 +2,18 @@
 // R5 — Supabase client bootstrap for browser-native FE
 //
 // IMPORTANT:
-// - We DO NOT import Supabase as an ES module (CDN +esm is unstable and can break).
+// - We DO NOT import Supabase as an ES module.
 // - We load the UMD build in core/index.html, which provides window.supabase.
-// - This file stays an ES module because liveSync imports createSupabaseClient from it.
+// - This file remains an ES module because liveSync imports createSupabaseClient from it.
 
 export function getRuntimeEnv() {
   const env = window.FE_ENV || {};
   return {
-    url: String(env.SUPABASE_URL || "https://snspeeohcnjtbisexwxp.supabase.co").trim(),
-    anonKey: String(env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNuc3BlZW9oY25qdGJpc2V4d3hwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwNjMyNjUsImV4cCI6MjA4NDYzOTI2NX0.VSm29h9luLDAqQCoRfUp0JtqcG_4D-qCdyEnS9duijM").trim(),
-    name: String(env.FE_ENV_NAME || "prod").trim() || "unknown",
+    url: String(env.SUPABASE_URL || "").trim(),
+    anonKey: String(env.SUPABASE_ANON_KEY || "").trim(),
+    name: String(env.FE_ENV_NAME || "").trim() || "unknown",
+    // Optional override for shared default world (used by liveSync.js)
+    defaultWorldId: String(env.FE_DEFAULT_WORLD_ID || "").trim(),
   };
 }
 

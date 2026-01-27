@@ -21,6 +21,26 @@ const LS = {
   lastPushedSeq: "fe.sync.last_pushed_seq",
 };
 
+// ------------------------------------------------------------------
+// R5 World Selection
+// ------------------------------------------------------------------
+// For the Live World MVP we want the *same* world to open on any device
+// (normal window, incognito, phone) without asking the user.
+//
+// Today (R5):
+// - If a world id is already stored locally, we use it.
+// - If not, we fall back to a shared default world id.
+//
+// Later (Auth / Business login):
+// - This default will be replaced by "org default world" coming from the server.
+//
+// You can override this via runtime env:
+//   window.FE_ENV.FE_DEFAULT_WORLD_ID = "<uuid>"
+//
+const FE_DEFAULT_WORLD_ID =
+  (window.FE_ENV && window.FE_ENV.FE_DEFAULT_WORLD_ID) ||
+  "00000000-0000-4000-8000-000000000001";
+
 function getOrCreateDeviceId() {
   let id = localStorage.getItem(LS.deviceId);
   if (id) return id;
@@ -32,7 +52,9 @@ function getOrCreateDeviceId() {
 function getOrCreateWorldId() {
   let id = localStorage.getItem(LS.worldId);
   if (id) return id;
-  id = crypto?.randomUUID?.() || String(Date.now()) + Math.random().toString(16).slice(2);
+
+  // Shared default world for R5 so new devices join the same dataset immediately.
+  id = FE_DEFAULT_WORLD_ID;
   localStorage.setItem(LS.worldId, id);
   return id;
 }

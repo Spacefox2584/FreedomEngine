@@ -26,6 +26,8 @@ const env = {
   SUPABASE_URL: process.env.SUPABASE_URL || "",
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || "",
   FE_ENV_NAME: process.env.FE_ENV_NAME || "unknown",
+  // Optional: override the shared default world id (uuid).
+  FE_DEFAULT_WORLD_ID: process.env.FE_DEFAULT_WORLD_ID || "",
 };
 
 const content = `// FreedomEngine Runtime Environment (generated)
@@ -38,6 +40,7 @@ window.FE_ENV = window.FE_ENV || {
   SUPABASE_URL: \`${esc(env.SUPABASE_URL)}\`,
   SUPABASE_ANON_KEY: \`${esc(env.SUPABASE_ANON_KEY)}\`,
   FE_ENV_NAME: \`${esc(env.FE_ENV_NAME)}\`,
+  FE_DEFAULT_WORLD_ID: \`${esc(env.FE_DEFAULT_WORLD_ID)}\`,
 };
 `;
 

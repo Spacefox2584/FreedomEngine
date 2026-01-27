@@ -9,6 +9,7 @@
 - Resync loop: local journal tail replays to Supabase when back online
 - Realtime subscriptions: remote edits flow in silently (no modals)
 - Status pill now reflects: Local / Offline / Syncing / Live / Degraded
+- New devices now join the same shared default world automatically (fixes incognito/phone seeing an empty board)
 - Added migration SQL for Live World tables (supabase/migrations/001_r5_live_world.sql)
 - Added build step to generate runtime env (core/runtime-env.js) from Vercel env vars
 
