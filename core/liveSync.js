@@ -21,35 +21,31 @@ const LS = {
   lastPushedSeq: "fe.sync.last_pushed_seq",
 };
 
+// ------------------------------------------------------------
+// R5 RULE (TEMPORARY):
+// For now, EVERYONE uses the same shared world.
+// This prevents "incognito is empty" and stops world drift.
+// Later, once Business Login/Auth exists, we will assign a unique world_id per business.
+// ------------------------------------------------------------
+const DEFAULT_WORLD_ID = "00000000-0000-4000-8000-000000000001";
+
 function getOrCreateDeviceId() {
   let id = localStorage.getItem(LS.deviceId);
   if (id) return id;
-  id = crypto?.randomUUID?.() || String(Date.now()) + Math.random().toString(16).slice(2);
+  id =
+    crypto?.randomUUID?.() ||
+    String(Date.now()) + Math.random().toString(16).slice(2);
   localStorage.setItem(LS.deviceId, id);
   return id;
 }
 
 function getOrCreateWorldId() {
-  const env = window.FE_ENV || {};
-  const forced = String(env.FE_DEFAULT_WORLD_ID || "").trim();
-
-  // If a default world is defined (via Vercel env var), it wins.
-  // This makes every new browser/incognito/device land in the same shared world,
-  // which is exactly what we want for R5 Live World MVP.
-  if (forced) {
-    const current = localStorage.getItem(LS.worldId);
-    if (current !== forced) localStorage.setItem(LS.worldId, forced);
-    return forced;
+  // R5: Default world ALWAYS wins (deterministic, no drift).
+  const current = localStorage.getItem(LS.worldId);
+  if (current !== DEFAULT_WORLD_ID) {
+    localStorage.setItem(LS.worldId, DEFAULT_WORLD_ID);
   }
-
-  // Otherwise: legacy behavior (per-device world).
-  let id = localStorage.getItem(LS.worldId);
-  if (id) return id;
-  id =
-    crypto?.randomUUID?.() ||
-    String(Date.now()) + Math.random().toString(16).slice(2);
-  localStorage.setItem(LS.worldId, id);
-  return id;
+  return DEFAULT_WORLD_ID;
 }
 
 function getLastPushedSeq() {
@@ -105,7 +101,12 @@ export async function initLiveWorld({ setStatusText } = {}) {
   await pullRemoteIntoLocal(supabase, worldId, deviceId);
 
   // 3) Subscribe to remote changes
-  const channel = subscribeRemoteChanges({ supabase, worldId, deviceId, setStatusText });
+  const channel = subscribeRemoteChanges({
+    supabase,
+    worldId,
+    deviceId,
+    setStatusText,
+  });
 
   // 4) Push local journal tail (offline queue replay)
   let stopped = false;
@@ -173,7 +174,9 @@ export async function initLiveWorld({ setStatusText } = {}) {
 async function ensureWorldRow(supabase, worldId) {
   // Worlds are just IDs for R5. (Operators/auth comes later.)
   const payload = { id: worldId, updated_by: "system" };
-  const { error } = await supabase.from(TABLES.world).upsert(payload, { onConflict: "id" });
+  const { error } = await supabase
+    .from(TABLES.world)
+    .upsert(payload, { onConflict: "id" });
   if (error) {
     // If the table doesn't exist yet, we don't hard-fail here; FE remains local.
     console.warn("ensureWorldRow failed:", error.message);
@@ -233,7 +236,7 @@ function dbRowToCard(row) {
     channel: row.channel || null,
     summary: row.summary || null,
     nextAction: row.next_action || null,
-    notes: Array.isArray(row.notes) ? row.notes : (row.notes || []),
+    notes: Array.isArray(row.notes) ? row.notes : row.notes || [],
     updated_at: row.updated_at ? Date.parse(row.updated_at) || Date.now() : Date.now(),
   };
 }
@@ -249,14 +252,28 @@ function subscribeRemoteChanges({ supabase, worldId, deviceId, setStatusText }) 
     // Cards
     channel.on(
       "postgres_changes",
-      { event: "*", schema: "public", table: TABLES.card, filter: `world_id=eq.${worldId}` },
+      {
+        event: "*",
+        schema: "public",
+        table: TABLES.card,
+        filter: `world_id=eq.${worldId}`,
+      },
       async (payload) => {
         const row = payload.new || payload.old;
         if (!row) return;
-        if (row.updated_device && String(row.updated_device) === String(getOrCreateDeviceId())) return;
+        if (
+          row.updated_device &&
+          String(row.updated_device) === String(getOrCreateDeviceId())
+        )
+          return;
 
         if (payload.eventType === "DELETE") {
-          await Store.ingestRemote({ type: "card", op: "delete", id: row.id, meta: { source: "remote", deviceId } });
+          await Store.ingestRemote({
+            type: "card",
+            op: "delete",
+            id: row.id,
+            meta: { source: "remote", deviceId },
+          });
           return;
         }
 
@@ -273,14 +290,28 @@ function subscribeRemoteChanges({ supabase, worldId, deviceId, setStatusText }) 
     // Lanes
     channel.on(
       "postgres_changes",
-      { event: "*", schema: "public", table: TABLES.lane, filter: `world_id=eq.${worldId}` },
+      {
+        event: "*",
+        schema: "public",
+        table: TABLES.lane,
+        filter: `world_id=eq.${worldId}`,
+      },
       async (payload) => {
         const row = payload.new || payload.old;
         if (!row) return;
-        if (row.updated_device && String(row.updated_device) === String(getOrCreateDeviceId())) return;
+        if (
+          row.updated_device &&
+          String(row.updated_device) === String(getOrCreateDeviceId())
+        )
+          return;
 
         if (payload.eventType === "DELETE") {
-          await Store.ingestRemote({ type: "lane", op: "delete", id: row.id, meta: { source: "remote", deviceId } });
+          await Store.ingestRemote({
+            type: "lane",
+            op: "delete",
+            id: row.id,
+            meta: { source: "remote", deviceId },
+          });
           return;
         }
 
@@ -292,7 +323,9 @@ function subscribeRemoteChanges({ supabase, worldId, deviceId, setStatusText }) 
             id: row.id,
             name: row.name,
             world_id: row.world_id,
-            updated_at: row.updated_at ? Date.parse(row.updated_at) || Date.now() : Date.now(),
+            updated_at: row.updated_at
+              ? Date.parse(row.updated_at) || Date.now()
+              : Date.now(),
           },
           meta: { source: "remote", deviceId },
         });
@@ -356,7 +389,11 @@ async function pushActionNow({ supabase, worldId, deviceId, action }) {
 
     if (type === "lane") {
       if (op === "delete") {
-        const { error } = await supabase.from(TABLES.lane).delete().eq("world_id", worldId).eq("id", id);
+        const { error } = await supabase
+          .from(TABLES.lane)
+          .delete()
+          .eq("world_id", worldId)
+          .eq("id", id);
         return !error;
       }
       const row = {
@@ -372,7 +409,11 @@ async function pushActionNow({ supabase, worldId, deviceId, action }) {
 
     if (type === "card") {
       if (op === "delete") {
-        const { error } = await supabase.from(TABLES.card).delete().eq("world_id", worldId).eq("id", id);
+        const { error } = await supabase
+          .from(TABLES.card)
+          .delete()
+          .eq("world_id", worldId)
+          .eq("id", id);
         return !error;
       }
 
@@ -389,7 +430,9 @@ async function pushActionNow({ supabase, worldId, deviceId, action }) {
         summary: data?.summary ?? null,
         next_action: data?.nextAction ?? null,
         notes: Array.isArray(data?.notes) ? data.notes : [],
-        created_at: data?.createdAt ? new Date(Number(data.createdAt)).toISOString() : new Date().toISOString(),
+        created_at: data?.createdAt
+          ? new Date(Number(data.createdAt)).toISOString()
+          : new Date().toISOString(),
         updated_by: "local",
         updated_device: deviceId,
       };
