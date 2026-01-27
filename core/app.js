@@ -20,7 +20,7 @@ const FE_CHANGELOG_URL = "/CHANGELOG.md";
 
 // R4 layout key
 const FE_LAYOUT_KEY = "fe.layout"; // "compact" | "wide"
-const FE_THEME_KEY = \"fe.theme\"; // \"dark\" | \"light\"
+const FE_THEME_KEY = "fe.theme"; // "dark" | "light"
 
 // --------------------
 // MANIFESTS
