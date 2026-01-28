@@ -60,6 +60,11 @@ export function createSupabaseClient() {
     realtime: { params: { eventsPerSecond: 10 } },
   });
 
+  // Convenience global for debugging and for any legacy code paths.
+  // NOTE: The Supabase URL + anon key are already present in FE runtime env;
+  // exposing the instantiated client does not meaningfully change the threat model.
+  window.FE_SUPABASE = _client;
+
   return { ok: true, client: _client, error: null };
 }
 
