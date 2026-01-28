@@ -4,12 +4,13 @@ import { loadManifest } from "./gizmoLoader.js";
 import { createSpaceManager } from "./spaceManager.js";
 import * as Store from "./store.js";
 import { initLiveWorld } from "./liveSync.js";
+import { initAuthOverlay } from "./auth.js";
 
 // ====================
 // FE META (R4)
 // ====================
 // Keep this boring and edit it when you tag a release.
-const FE_RELEASE = "FE.01.A2.R5";
+const FE_RELEASE = "FE.01.A2.R6";
 const FE_VERSION = "0.1.0";
 
 // Where feedback should go. Change this to your business email.
@@ -52,6 +53,9 @@ const btnFeedback = document.getElementById("fe-btn-feedback");
 
 // R4 button
 const btnLayout = document.getElementById("fe-btn-layout");
+
+// Auth
+const btnAccount = document.getElementById("fe-btn-account");
 
 // Inspector
 const btnInspectToggle = document.getElementById("fe-inspect-toggle");
@@ -124,6 +128,13 @@ async function boot() {
     const next = document.body.dataset.theme === "dark" ? "light" : "dark";
     applyTheme(next);
   });
+
+
+// Auth overlay (R6) — non-blocking; shell + gizmos still load underneath.
+await initAuthOverlay({
+  accountButton: btnAccount,
+  releaseTag: FE_RELEASE,
+});
 
   // Changelog
   btnChangelog?.addEventListener("click", () => openChangelogPane());

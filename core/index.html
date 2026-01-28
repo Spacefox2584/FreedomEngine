@@ -24,6 +24,10 @@
         <div class="spaces" id="fe-spaces" aria-label="Spaces"></div>
 
         <div class="topbar-right">
+          <button class="btn ghost" id="fe-btn-account" title="Sign in">
+            Sign in
+          </button>
+
           <!-- ✅ R4: Layout toggle -->
           <button class="btn ghost" id="fe-btn-layout" title="Toggle layout mode">
             Layout
@@ -94,6 +98,26 @@
       </div>
     </div>
 
+
+
+<!-- AUTH OVERLAY (R6) -->
+<div id="fe-auth-overlay" class="fe-auth-overlay" data-open="0" aria-hidden="true">
+  <div class="fe-auth-modal" role="dialog" aria-modal="true" aria-label="Sign in">
+    <div class="fe-auth-title">Sign in</div>
+    <div class="fe-auth-sub">Business login</div>
+
+    <label class="fe-auth-label">
+      Email
+      <input id="fe-auth-email" class="fe-auth-input" type="email" autocomplete="email" placeholder="you@company.com" />
+    </label>
+
+    <button id="fe-auth-send" class="btn primary fe-auth-btn">Send magic link</button>
+    <div id="fe-auth-msg" class="fe-auth-msg"></div>
+
+    <div class="fe-auth-divider"></div>
+    <button id="fe-auth-guest" class="btn ghost fe-auth-btn">Continue as guest</button>
+  </div>
+</div>
     <!--
       R5: Runtime env injection (generated at build/deploy time).
       This keeps Supabase URLs/keys out of the repo and lets Vercel env vars drive prod.

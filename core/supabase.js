@@ -40,7 +40,7 @@ export function createSupabaseClient() {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: false,
+      detectSessionInUrl: true,
     },
     realtime: {
       params: {

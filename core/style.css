@@ -510,3 +510,92 @@ body[data-theme="dark"] select option {
   background-color: #ffffff;
   color: #111111;
 }
+
+
+
+/* ============================
+   R6 AUTH OVERLAY (single modal)
+   ============================ */
+.fe-auth-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+  z-index: 9999;
+}
+.fe-auth-overlay[data-open="1"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fe-auth-overlay { transition: none; }
+}
+.fe-auth-modal {
+  width: min(420px, 92vw);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(20,20,20,0.92);
+  color: var(--text);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  display: grid;
+  gap: 10px;
+}
+body[data-theme="light"] .fe-auth-modal {
+  background: rgba(255,255,255,0.92);
+}
+.fe-auth-title {
+  font-weight: 900;
+  font-size: 16px;
+  letter-spacing: 0.2px;
+}
+.fe-auth-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: -6px;
+  margin-bottom: 6px;
+}
+.fe-auth-label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.fe-auth-input {
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 0 10px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  outline: none;
+}
+body[data-theme="light"] .fe-auth-input {
+  background: rgba(0,0,0,0.04);
+}
+.fe-auth-input:focus {
+  border-color: rgba(138, 92, 255, 0.65);
+  box-shadow: 0 0 0 3px rgba(138, 92, 255, 0.18);
+}
+.fe-auth-btn { width: 100%; }
+.fe-auth-msg {
+  min-height: 16px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.fe-auth-msg[data-kind="error"] { color: #ff6b6b; }
+.fe-auth-msg[data-kind="ok"] { color: #6bffb1; }
+.fe-auth-divider {
+  height: 1px;
+  background: var(--border);
+  opacity: 0.8;
+  margin: 6px 0;
+}

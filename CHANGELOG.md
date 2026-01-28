@@ -1,5 +1,16 @@
 # FreedomEngine — Changelog
 
+## FE.01.A2.R6 — Auth Overlay MVP
+- Single auth overlay modal (calm fade + blur) while FE shell + gizmos load underneath
+- Email magic link sign-in (Supabase Auth OTP)
+- Continue as Guest (session-only; resets on tab close)
+- Account button added to topbar (Sign in / Guest / Signed in)
+
+Not included:
+- Business/org world assignment
+- Permissions / teams / RLS policies
+- Presence/avatars UI
+
 ## FE.01.A2.R5.3 — C-Deck UI Polish
 - Right pane closes when clicking outside it
 - Default theme is Dark; theme button reflects current theme
