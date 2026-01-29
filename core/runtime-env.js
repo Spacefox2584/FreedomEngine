@@ -14,4 +14,5 @@ window.FE_ENV = window.FE_ENV || {
   SUPABASE_URL: "",
   SUPABASE_ANON_KEY: "",
   FE_ENV_NAME: "local",
+  FE_STAFF_JSON: "",
 };
