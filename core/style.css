@@ -1,3 +1,4 @@
+/* core/style.css */
 /* =========================
    FE CORE THEME TOKENS
    ========================= */
@@ -17,26 +18,19 @@
 /* =========================
    LIGHT THEME (default)
    ========================= */
-/*
-Goal:
-- Top bar: #b2b2b2 (darker than page)
-- Underneath: lighter neutral
-- Boxes/cards: white
-- Keep rectangular feel (no bubbly softness creep)
-*/
 body[data-theme="light"] {
-  --bg: #eeeeee;                 /* page base */
-  --panel: #f6f6f6;              /* subtle surface */
-  --panel-2: #fafafa;            /* extra subtle */
-  --topbar: #b2b2b2;             /* requested */
-  --topbar-2: #c2c2c2;           /* gentle gradient */
+  --bg: #eeeeee;
+  --panel: #f6f6f6;
+  --panel-2: #fafafa;
+  --topbar: #b2b2b2;
+  --topbar-2: #c2c2c2;
   --text: #000000;
   --muted: #4f5863;
 
   --border: rgba(0, 0, 0, 0.12);
   --border-2: rgba(0, 0, 0, 0.18);
 
-  --card: #ffffff;               /* boxes must be white */
+  --card: #ffffff;
   --card-2: #ffffff;
 
   --shadow: 0 10px 26px rgba(0,0,0,0.10);
@@ -53,15 +47,8 @@ body[data-theme="light"] {
 }
 
 /* =========================
-   DARK THEME (ChatGPT-ish desktop vibe)
+   DARK THEME
    ========================= */
-/*
-Goal:
-- Dark charcoal background
-- Slightly lighter panels
-- Borders subtle but visible
-- Text calm, not neon
-*/
 body[data-theme="dark"] {
   --bg: #0f1115;
   --panel: #141821;
@@ -171,8 +158,6 @@ body {
 
   border-radius: 999px;
   border: 1px solid var(--pill-border);
-
-  /* R4.3: lighten space tabs */
   background: rgba(255,255,255,0.18);
 
   color: var(--text);
@@ -181,30 +166,19 @@ body {
   transition: transform 0.05s ease, border-color 0.1s ease, background 0.1s ease;
 }
 
-body[data-theme="light"] .space-tab {
-  background: rgba(255,255,255,0.85);
-}
-
-body[data-theme="dark"] .space-tab {
-  background: rgba(255,255,255,0.08);
-}
+body[data-theme="light"] .space-tab { background: rgba(255,255,255,0.85); }
+body[data-theme="dark"]  .space-tab { background: rgba(255,255,255,0.08); }
 
 .space-tab:hover { border-color: var(--border-2); }
 .space-tab:active { transform: translateY(1px); }
 
-/* R4.3: active space is clearly outlined (theme-aware) */
 .space-tab[data-active="1"] {
   background: transparent;
   border-width: 2px;
 }
 
-body[data-theme="light"] .space-tab[data-active="1"] {
-  border-color: rgba(107, 92, 255, 0.70);
-}
-
-body[data-theme="dark"] .space-tab[data-active="1"] {
-  border-color: rgba(255, 106, 0, 0.85);
-}
+body[data-theme="light"] .space-tab[data-active="1"] { border-color: rgba(107, 92, 255, 0.70); }
+body[data-theme="dark"]  .space-tab[data-active="1"] { border-color: rgba(255, 106, 0, 0.85); }
 
 .space-icon {
   width: 18px;
@@ -243,7 +217,6 @@ body[data-theme="dark"] .space-tab[data-active="1"] {
   box-shadow: 0 0 0 3px var(--accent-dot-glow);
 }
 
-/* R5: status modes (subtle, no flashing) */
 .status[data-mode="offline"] .dot {
   background: #b45309;
   box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.20);
@@ -265,7 +238,6 @@ body[data-theme="dark"] .space-tab[data-active="1"] {
    LAYOUT
    ========================= */
 
-/* R3.1: Main is full width by default (no reserved pane column) */
 .main {
   display: grid;
   grid-template-columns: 1fr;
@@ -295,7 +267,6 @@ body[data-theme="dark"] .space-tab[data-active="1"] {
    PANE
    ========================= */
 
-/* R3.1b: Off-canvas pane on desktop, animated (no display:none) */
 .pane {
   position: fixed;
   top: 0;
@@ -319,7 +290,6 @@ body[data-theme="dark"] .space-tab[data-active="1"] {
   z-index: 40;
 }
 
-/* R3.1b: Pane slides in only when opened */
 body.pane-open .pane {
   transform: translateX(0);
   opacity: 1;
@@ -335,9 +305,7 @@ body.pane-open .pane {
   border-bottom: 1px solid var(--border);
 }
 
-.pane-title {
-  font-weight: 800;
-}
+.pane-title { font-weight: 800; }
 
 .pane-body {
   padding: 12px;
@@ -393,13 +361,8 @@ body.pane-open .pane {
 .btn:hover { border-color: var(--border-2); }
 .btn.ghost { background: transparent; }
 
-/* Ghost hover states (top-right pills etc.) */
-.btn.ghost:hover {
-  background: rgba(255,255,255,0.06);
-}
-body[data-theme="light"] .btn.ghost:hover {
-  background: rgba(0,0,0,0.04);
-}
+.btn.ghost:hover { background: rgba(255,255,255,0.06); }
+body[data-theme="light"] .btn.ghost:hover { background: rgba(0,0,0,0.04); }
 
 .btn.small {
   padding: 8px 10px;
@@ -490,9 +453,7 @@ body[data-theme="light"] .btn.ghost:hover {
     border-top: 1px solid var(--border);
   }
 
-  body.pane-open .pane {
-    transform: none;
-  }
+  body.pane-open .pane { transform: none; }
 
   .inspector { right: 10px; left: 10px; width: auto; }
 }
@@ -511,10 +472,8 @@ body[data-theme="dark"] select option {
   color: #111111;
 }
 
-
-
 /* ============================
-   R6 AUTH OVERLAY (single modal)
+   R6.4 AUTH OVERLAY (business login + staff picker)
    ============================ */
 .fe-auth-overlay {
   position: fixed;
@@ -538,8 +497,9 @@ body[data-theme="dark"] select option {
 @media (prefers-reduced-motion: reduce) {
   .fe-auth-overlay { transition: none; }
 }
+
 .fe-auth-modal {
-  width: min(420px, 92vw);
+  width: min(460px, 92vw);
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 16px;
@@ -552,6 +512,7 @@ body[data-theme="dark"] select option {
 body[data-theme="light"] .fe-auth-modal {
   background: rgba(255,255,255,0.92);
 }
+
 .fe-auth-title {
   font-weight: 900;
   font-size: 16px;
@@ -563,12 +524,14 @@ body[data-theme="light"] .fe-auth-modal {
   margin-top: -6px;
   margin-bottom: 6px;
 }
+
 .fe-auth-label {
   display: grid;
   gap: 6px;
   font-size: 12px;
   color: var(--muted);
 }
+
 .fe-auth-input {
   height: 38px;
   border-radius: 10px;
@@ -578,14 +541,15 @@ body[data-theme="light"] .fe-auth-modal {
   color: var(--text);
   outline: none;
 }
-body[data-theme="light"] .fe-auth-input {
-  background: rgba(0,0,0,0.04);
-}
+body[data-theme="light"] .fe-auth-input { background: rgba(0,0,0,0.04); }
+
 .fe-auth-input:focus {
   border-color: rgba(138, 92, 255, 0.65);
   box-shadow: 0 0 0 3px rgba(138, 92, 255, 0.18);
 }
+
 .fe-auth-btn { width: 100%; }
+
 .fe-auth-msg {
   min-height: 16px;
   font-size: 12px;
@@ -593,9 +557,80 @@ body[data-theme="light"] .fe-auth-input {
 }
 .fe-auth-msg[data-kind="error"] { color: #ff6b6b; }
 .fe-auth-msg[data-kind="ok"] { color: #6bffb1; }
-.fe-auth-divider {
-  height: 1px;
-  background: var(--border);
-  opacity: 0.8;
-  margin: 6px 0;
+
+/* Staff */
+.fe-staff-wrap {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 10px;
+}
+.fe-staff-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.fe-staff-title {
+  font-weight: 900;
+  font-size: 14px;
+}
+.fe-staff-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.fe-staff-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 420px) {
+  .fe-staff-grid { grid-template-columns: 1fr; }
+}
+
+.fe-staff-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text);
+  padding: 12px;
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  text-align: left;
+}
+body[data-theme="light"] .fe-staff-card {
+  background: rgba(0,0,0,0.03);
+}
+
+.fe-staff-card:hover {
+  border-color: var(--border-2);
+}
+
+.fe-staff-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  border: 1px solid var(--pill-border);
+  background: var(--pill);
+}
+
+.fe-staff-name {
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.fe-staff-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.fe-staff-pin-wrap {
+  display: grid;
+  gap: 10px;
 }
