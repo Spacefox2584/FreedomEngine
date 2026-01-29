@@ -1,3 +1,4 @@
+<!-- core/index.html -->
 <!doctype html>
 <html lang="en">
   <head>
@@ -9,7 +10,6 @@
     <link rel="stylesheet" href="./layout.css" />
   </head>
 
-  <!-- ✅ Light theme is default -->
   <body data-theme="dark" data-layout="compact">
     <div id="fe-app" class="app">
       <header class="topbar">
@@ -28,12 +28,10 @@
             Sign in
           </button>
 
-          <!-- ✅ R4: Layout toggle -->
           <button class="btn ghost" id="fe-btn-layout" title="Toggle layout mode">
             Layout
           </button>
 
-          <!-- ✅ R3.2: Changelog + Feedback -->
           <button class="btn ghost" id="fe-btn-changelog" title="View changelog">
             Changelog
           </button>
@@ -98,38 +96,66 @@
       </div>
     </div>
 
+    <!-- AUTH OVERLAY (R6.4) -->
+    <div id="fe-auth-overlay" class="fe-auth-overlay" data-open="0" aria-hidden="true" data-step="login">
+      <div class="fe-auth-modal" role="dialog" aria-modal="true" aria-label="Sign in">
+        <div class="fe-auth-title">Sign in</div>
+        <div class="fe-auth-sub">Business login</div>
 
+        <label class="fe-auth-label">
+          Email
+          <input
+            id="fe-auth-email"
+            class="fe-auth-input"
+            type="email"
+            autocomplete="email"
+            placeholder="you@company.com"
+          />
+        </label>
 
-<!-- AUTH OVERLAY (R6) -->
-<div id="fe-auth-overlay" class="fe-auth-overlay" data-open="0" aria-hidden="true">
-  <div class="fe-auth-modal" role="dialog" aria-modal="true" aria-label="Sign in">
-    <div class="fe-auth-title">Sign in</div>
-    <div class="fe-auth-sub">Business login</div>
+        <label class="fe-auth-label">
+          Password
+          <input
+            id="fe-auth-pass"
+            class="fe-auth-input"
+            type="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+          />
+        </label>
 
-    <label class="fe-auth-label">
-      Email
-      <input id="fe-auth-email" class="fe-auth-input" type="email" autocomplete="email" placeholder="you@company.com" />
-    </label>
+        <button id="fe-auth-login" class="btn primary fe-auth-btn">Sign in</button>
+        <div id="fe-auth-msg" class="fe-auth-msg"></div>
 
-    <button id="fe-auth-send" class="btn primary fe-auth-btn">Send magic link</button>
-    <div id="fe-auth-msg" class="fe-auth-msg"></div>
+        <!-- STAFF PICKER -->
+        <div id="fe-staff-wrap" class="fe-staff-wrap" style="display:none">
+          <div class="fe-staff-header">
+            <div id="fe-staff-title" class="fe-staff-title">Choose staff</div>
+            <button id="fe-staff-back" class="btn ghost small" type="button">Back</button>
+          </div>
 
-    <div class="fe-auth-divider"></div>
-    <button id="fe-auth-guest" class="btn ghost fe-auth-btn">Continue as guest</button>
-  </div>
-</div>
-    <!--
-      R5: Runtime env injection (generated at build/deploy time).
-      This keeps Supabase URLs/keys out of the repo and lets Vercel env vars drive prod.
-    -->
+          <div id="fe-staff-hint" class="fe-staff-hint">Select who you are.</div>
 
-    <!-- ✅ Load Supabase UMD build (stable in browsers; no ESM wrapper roulette) -->
+          <div id="fe-staff-grid" class="fe-staff-grid"></div>
+
+          <div id="fe-staff-pin-wrap" class="fe-staff-pin-wrap" style="display:none">
+            <label class="fe-auth-label">
+              Staff PIN
+              <input id="fe-staff-pin" class="fe-auth-input" type="password" inputmode="numeric" placeholder="4 digits" />
+            </label>
+            <button id="fe-staff-pin-confirm" class="btn primary fe-auth-btn" type="button">Enter</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Supabase UMD -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
-    <!-- ✅ FE runtime env (window.FE_ENV) -->
+    <!-- FE runtime env (window.FE_ENV) -->
     <script src="./runtime-env.js"></script>
 
-    <!-- ✅ Boot FE -->
+    <!-- Boot FE -->
     <script type="module" src="./app.js"></script>
   </body>
 </html>
